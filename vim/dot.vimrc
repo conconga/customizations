@@ -1,8 +1,7 @@
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " ~/.vimrc
 "
-" I might be wrong, but I thing this file is based on a old version of
-" https://github.com/shumphrey/vimrc
+" This file is based on a old version of https://github.com/shumphrey/vimrc
 " I have used this vimrc for many years, but now I want to give the
 " right credits to the author, which I suppose is shumphrey. 
 "
@@ -377,5 +376,11 @@ map \D :Dict
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " highlight a line with ##### marks
 let @t = ":s/[[:blank:]]*$//I-- ^vlr#A ##O500A jhlkv0r#j^kv0r ^hr#ElDyyjp"
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Scrolling, nicer scrolling when wrapping
+set sidescroll=1
+set sidescrolloff=10
+set scrolloff=3
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
