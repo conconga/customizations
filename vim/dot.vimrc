@@ -384,3 +384,31 @@ set sidescrolloff=10
 set scrolloff=3
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Plugins
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" ** CSCOPE **
+" from http://cscope.sourceforge.net/cscope_maps.vim
+" done by "Jason Duell":
+
+"''source /?/?/?/?/?/cscope_maps.vim
+
+" ** TAGLIST **
+" from https://github.com/vim-scripts/taglist.vim/blob/master/plugin/taglist.vim
+" or from http://vim.sourceforge.net/scripts/script.php?script_id=273
+" done by "Yegappan Lakshmanan":
+
+"''source /?/?/?/?/?/taglist.vim
+
+" ** BUFEXPLORER **
+" from http://www.vim.org/scripts/script.php?script_id=42
+" done by "jeff lanzarotta":
+
+"''source /?/?/?/?/?/bufexplorer.vim
+
+" ** DICT **
+" from https://github.com/szw/vim-dict
+" done by "Szymon Wrozynski":
+
+"''source /?/?/?/?/?/dict.vim
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
