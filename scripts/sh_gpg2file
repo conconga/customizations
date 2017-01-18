@@ -1,0 +1,42 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script extracts files with names like "file.tar.gpg" or                #
+#               "file.docx.gpg" to files "file.tar" and "file.docx".                        #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+# verify #arguments:
+if [ $# = 0 ]; then
+    echo "invalid number of arguments!"
+    echo
+    echo "Usage:"
+    echo "  `basename "$0"` [file1.gpg] [file2.gpg] [...]"
+    echo 
+    exit -1
+fi
+
+echo "please give the key's password "
+read pass
+
+while [ $# -gt 0 ]; do
+    echo "===== file: $1 ====="
+    if [ -e "$1" ]; then
+        # remover extensao .gpg:
+        dest=`echo "$1" | sed 's/\.[gG][pP][gG]$//'`
+        echo ">> to: $dest"
+        gpg -o "$dest" --passphrase "$pass" -d "$1"
+    fi
+    shift
+done
+
+#############################################################################################

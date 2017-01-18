@@ -1,0 +1,26 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script returns a unique file name in the given path.                   #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+# usage:
+[ $# = 1 ] || { echo "Usage:"; echo "  sh_uniqfile <PATH>"; exit -1; }
+
+while [ true ]; do
+    file=`date +"%N" | md5sum | grep -o "^[[:graph:]]\+"`
+    [ ! -e "$1/$file" ] && break;
+done
+
+echo "$1/$file"
+#############################################################################################

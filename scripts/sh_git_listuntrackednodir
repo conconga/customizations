@@ -1,0 +1,23 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script list untracked files in current GIT project.                    #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+git status --porcelain -uall | sed 's/^..[[:blank:]]*//' | while read nome; do
+	if [ -f "$nome" -o -L "$nome" ]; then
+		echo "$nome"
+	fi
+done
+
+#############################################################################################

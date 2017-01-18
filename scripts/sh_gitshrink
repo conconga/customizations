@@ -1,0 +1,122 @@
+#!/bin/bash
+########################################################################################################################################
+###########                                                                                                                  ###########
+######                                                                                                                            ######
+##                                                                                                                                    ##
+# \author       Luciano Augusto Kruk                                                                                                   #
+# \web          www.kruk.eng.br                                                                                                        #
+#                                                                                                                                      #
+# \description  This script shrinks a GIT repository by:                                                                               #
+#                 - removing some files from the GIT version control                                                                   #
+#                 - repacking                                                                                                          #
+#                 - pruning old commits                                                                                                #
+#               The list of big files in the project can be accessed using the script 'sh_git_largestobj'                              #
+#                                                                                                                                      #
+# \usage:                                                                                                                              #
+#  	$0 [list.files.to.remove]                                                                                                          #
+#                                                                                                                                      #
+# 1. Clone your repo                                                                                                                   #
+# 2. Remove your remote with git remote rm origin                                                                                      #
+# 3. Make sure .git/packed-refs is empty or only contains an entry ending in refs/head/master                                          #
+# 4. git filter-branch --index-filter 'git rm --cached --ignore-unmatch large_file.jar my-sub-project/* ReallyBigPhotoshoFile.psd'     #
+# 5. rm -rf .git/refs/original/                                                                                                        #
+# 6. git reflog expire --expire=now --all                                                                                              #
+# 7. git fsck --full --unreachable                                                                                                     #
+# 8. git repack -A -d                                                                                                                  #
+# 9. git gc --aggressive --prune=now                                                                                                   #
+#                                                                                                                                      #
+# \copyright    Please keep this head when you distribute this script.                                                                 #
+##                                                                                                                                    ##
+######                                                                                                                            ######
+###########                                                                                                                  ###########
+########################################################################################################################################
+
+# verify #arguments:
+if [ $# -eq 0 ]; then
+    echo "|="
+    echo "| This script might remove some hige files from the project. Use:"
+    echo "|    `basename $0`  [file-with-a-list-of-files-to-remove]"
+    echo "|"
+    echo "| Continue with basic shrink options..."
+    echo "|="
+fi
+
+TMPFILE0=/tmp/`echo $RANDOM | md5sum | awk '{ printf $1 }'`
+TMPFILE1=/tmp/`echo $RANDOM | md5sum | awk '{ printf $1 }'`
+TMPFILE2=/tmp/`echo $RANDOM | md5sum | awk '{ printf $1 }'`
+
+# check for git-root (bare repository or not):
+if [ `ls -1a | grep -c ".git"` -gt 0 -a -d .git/info ]; then
+	GITROOT=.git
+else 
+	if [ `ls -1 | grep -c "info"` -gt 0 -a -d refs/heads ]; then
+		GITROOT=.
+	else
+		echo "could not find git root folder"
+		exit -1;
+	fi
+fi
+SIZE1=`du -sch $GITROOT | tail -n1 | grep -o "^[[:graph:]]\+"`
+#echo "GITROOT = $GITROOT"
+
+# check for remotes:
+[ `git branch -a | grep -c remotes` -gt 0 ] && { echo "this repository still has remotes; please remove them"; exit -1; }
+[ `git remote -v | wc -l` -gt 0 ]           && { echo "this repository still has remotes; please remove them"; exit -1; }
+
+# check for 'master' branch checked-out
+[ `git branch -a | grep -c "\*[[:blank:]]\+master"` -gt 0 ] || { echo "branch 'master' is not checked out"; exit -1; }
+
+# check for a dirty index
+[ `git status --porcelain | wc -l` -gt 0 ] && { echo "dirty index! aborting!"; exit -1; }
+
+# remove all other branches
+git branch -a | grep -v "master" | sed 's/^[[:blank:]]*\([[:graph:]]\+\).*$/\1/' | while read branch; do
+	echo "removing branch '$branch' ..."
+	git branch -D "$branch"
+done
+
+# 3. Make sure .git/packed-refs is empty or only contains an entry ending in refs/head/master
+cat $GITROOT/packed-refs | grep "[[:blank:]]refs.heads.master" > $TMPFILE0
+mv $TMPFILE0 $GITROOT/packed-refs
+
+# removing big files:
+# git filter-branch -f --index-filter 'git ls-files --cached -i -x "*.mat" -x "*.zip" -x "*.exe" \
+# 	-x "*.EXE" -x "*.avi" -x "*.in" -x "*.out" | while read nome; do git rm --cached           \
+# 	--ignore-unmatch  "$nome" ; done ' master | grep -i "rewrite.*([0-9]"
+
+if true; then
+	# check for list-file
+	if [ $# -gt 0 ]; then
+		[ ! -e $1 ] && { echo "list file '$1' does not exist; aborting.."; exit -1; }
+
+		# build the filter script:
+		# (por causa de listas grandes e nomes de arquivos especiais, tive que criar um script-filtro)
+		cat "$1" | grep -v "^[[:blank:]]*$\|^#" | sed 's/^[[:blank:]]*\(.*\)[[:blank:]]*$/\1/' | \
+			while read aline; do printf 'git rm --cached --ignore-unmatch %q \n' "$aline"; done \
+			> $TMPFILE1
+
+		# build the execution script:
+		echo "git filter-branch -f --index-filter 'bash -c \"source $TMPFILE1\"' master" > $TMPFILE2
+
+		# removing listed files:
+		echo "removing listed files ..."
+		source "$TMPFILE2"
+
+		# removing temporary files:
+		rm -f "$TMPFILE1" "$TMPFILE2"
+	fi
+fi
+
+# some other steps
+rm -rf .git/refs/original/
+time {
+	#git fsck --full --unreachable
+	git repack -A -d
+	git pack-refs --all --prune
+	git reflog expire --expire=now --expire-unreachable=now --all
+	git gc --aggressive --prune=now
+}
+
+SIZE2=`du -sch $GITROOT | tail -n1 | grep -o "^[[:graph:]]\+"`
+
+echo "after all, git folder reduced from $SIZE1 to $SIZE2"

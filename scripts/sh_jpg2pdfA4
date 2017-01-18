@@ -1,0 +1,55 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script converts a JPG picture into a PDF file with A4 page size.       #
+#               If the pdf-file argument is not provided, the script creates a file         #
+#               with name similar to the input jpg file.                                    #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+
+fn_usage() {
+    name=`basename "$0"`
+    echo
+    echo "Usage:"
+    echo
+    echo "   $name  <jpg-file>  [pdf-file]"
+    echo
+    exit -1
+}
+
+# verify #arguments:
+if [ $# -ne 1 -a $# -ne 2 ]; then
+    echo "invalid number of arguments!"
+    fn_usage
+fi
+
+# verify input file:
+[[ ! -e "$1" ]] && { echo "invalid input file"; fn_usage; }
+
+# verify output file:
+if [ "$2"X = "X" ]; then
+    pdf=`echo "$1" | sed 's/\(\.[jJ][pP][gG]\)*$/.pdf/'`
+else
+    pdf="$2"
+fi
+echo "pdf file = $pdf"
+
+unit=PixelsPerInch
+dens=150
+pagesize=$((dens*827/100))x$((dens*1169/100))
+
+convert "$1" -compress jpeg -quality 100                \
+    -resize $pagesize -gravity center -extent $pagesize \
+    -repage $pagesize -units $unit -density ${dens}x${dens} "$pdf"
+
+#############################################################################################
