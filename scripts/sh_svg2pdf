@@ -6,8 +6,7 @@
 # \author       Luciano Augusto Kruk                                                        #
 # \web          www.kruk.eng.br                                                             #
 #                                                                                           #
-# \description  This script converts a file encoded with iso8859-1 to a with utf-8.         #
-#               The original file is removed.                                               #
+# \description  This script converts SVG files to PDF files.                                #
 #                                                                                           #
 # \copyright    Please keep this head when you distribute this script.                      #
 ##                                                                                         ##
@@ -15,22 +14,31 @@
 ###########                                                                       ###########
 #############################################################################################
 
-# Este script converte arquivos textos do formato ISO-8859-1 para
-# o formato UTF-8.
-
 if [ $# -eq 0 ]; then
     echo
     echo "Usage:"
-    echo "   `basename $0` [file-iso8859-1-encoded]"
+    echo "   `basename $0` <svg-file-1.svg> [svg-file-2.svg ...]"
     echo
     exit -1
 fi
 
-TMP=`sh_uniqfile /tmp/`
+[ "`which inkscape`x" = "x" ] && { echo "'inkscape' NOT found! aborting..."; exit -1; }
+[ "`which epstopdf`x" = "x" ] && { echo "'epstopdf' NOT found! aborting..."; exit -1; }
+
 while [ $# -gt 0 ]; do
-	iconv -f iso88591 -t utf8 -o $TMP "$1"
-	mv -v $TMP "$1"
-	shift
+    suf=`echo $1 | sed 's/^.*\.//'`
+    base=`basename $1 .$suf`
+    #echo "suf = $suf; base = $base"
+    #inkscape "$1" -D -A "./$base.pdf" 2&> /dev/null
+	
+	inkscape "$1" -D -T -B --verb=ObjectRotate90 -E "./$base.eps"
+    epstopdf --nocompress "$base.eps"
+	rm -fv "$base.eps"
+
+    if [ $? -eq 0 ]; then
+        echo "File ./$base.pdf created. Done!"
+    fi
+    shift
 done
 
 #############################################################################################
