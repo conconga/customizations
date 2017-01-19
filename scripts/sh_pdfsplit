@@ -1,0 +1,51 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script extracts from a PDF file each page into a separated PDF file.   #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+if test $# != 1 ; then
+	echo "incorrect number of arguments"
+    echo
+    echo "Usage:"
+    echo "  `basename $0` <pdf-file.pdf>"
+    echo
+	exit -1
+fi
+
+if test ! -e "$1"; then
+	echo "Could NOT find the source file '$1'. Aborting.."
+	exit -1
+fi
+
+# numero de paginas do PDF:
+pag=`pdfinfo "$1" | grep "^Pages"`
+if test $? != 0; then
+	echo "Could NOT read source file."
+	exit -1
+fi
+pag=`echo $pag | cut -d: -f2`
+echo "Number of pages = $pag"
+
+# nome dos arquivos de destino:
+dest=`basename "$1" | sed 's/\.[pP][dD][fF]$//'`
+echo "output filename = $dest-%03d.pdf"
+
+for ((i=1;i<=$pag;i++)); do
+	saida=`printf "$dest-%03d.pdf" $i`
+	echo "extracting page $i from $1 to $saida"
+	gs -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -sPAPERSIZE=a4 \
+		-dFirstPage=$i -dLastPage=$i -sOutputFile="$saida" "$1" &> /dev/null
+done
+
+#############################################################################################

@@ -1,0 +1,45 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script converts a PDF file (only one page file) to a JPG picture.      #
+#               if the jpg-file argument is not provides, the script creates a file         #
+#               with the name similar to the PDF file and JPG extension.                    #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+fn_usage() {
+    name=`basename "$0"`
+    echo
+    echo "Usage:"
+    echo "   $name  <pdf-file>  [optional-jpg-file] "
+    echo
+}
+
+if [ $# -ne 1 -a $# -ne 2 ]; then
+    fn_usage
+    exit -1
+fi
+
+[[ ! -e "$1" ]] && { fn_usage; exit -2; }
+
+if [ "$2"X = "X" ]; then
+    jpg=`echo "$1" | sed 's/\.[pP][dD][fF]$/.jpg/'`
+else
+    jpg="$2"
+fi
+
+convert -verbose -density 150x150 -trim \
+    "$1" \
+    -quality 100   -flatten -sharpen 0x1.0 \
+    "$jpg"
+
+#############################################################################################

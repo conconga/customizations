@@ -1,0 +1,43 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script extracts equations from a PDF file generated with LATEX         #
+#                package {preview} activated. Each page of file shall contain an individual #
+#                equation. As output, each equation is converted in two PNG-files, one      #
+#                cropped around content and another "as is".                                #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+if [ $# -eq 0 ]; then
+    echo
+    echo "Usage:"
+    echo "   `basename $0` <pdf-file-with-equations>"
+    echo
+    exit -1;
+fi
+
+tmpfile=`sh_uniqfile /tmp/`
+[ "`which pdfcrop`x" = "x" ] && { has_pdfcrop=0; echo "'pdfcrop' NOT found!"; } || has_pdfcrop=1
+[ "`which convert`x" = "x" ] && { echo "'convert' NOT found!"; exit -1; }
+
+while [ $# -gt 0 ]; do
+	[ -e "$1" ] || { echo "file '$1' NOT found!"; shift; continue; }
+	[ $has_pdfcrop ] && pdfcrop "$1" $tmpfile 2>&1 > /dev/null
+	[ -e $tmpfile ] || { echo "pdfcrop failed for file '$1'"; continue; }
+
+	convert -density 300 "$1"       -quality 90 out-tw.png
+	convert -density 300 "$tmpfile" -quality 90 out-cr.png
+
+	shift
+done
+
+#############################################################################################

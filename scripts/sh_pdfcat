@@ -1,0 +1,58 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script concatenates several different PDF files to only one.           #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+cmd="                                          \
+gs                                             \
+-sDEVICE=pdfwrite                              \
+-dAntiAliasColorImage=false                    \
+-dAntiAliasGrayImage=false                     \
+-dAntiAliasMonoImage=false                     \
+-dAutoFilterColorImages=false                  \
+-dAutoFilterGrayImages=false                   \
+-dDownsampleColorImages=false                  \
+-dDownsampleGrayImages=false                   \
+-dDownsampleMonoImages=false                   \
+-dColorConversionStrategy=/LeaveColorUnchanged \
+-dConvertCMYKImagesToRGB=false                 \
+-dConvertImagesToIndexed=false                 \
+-dUCRandBGInfo=/Preserve                       \
+-dPreserveHalftoneInfo=true                    \
+-dPreserveOPIComments=true                     \
+-dPreserveOverprintSettings=true               \
+-o "
+
+if [ $# -le 2 ]; then
+    echo
+    echo "USAGE:"
+    echo "   sh_pdfcat <output_file.pdf> <file_1.pdf> <file_2.pdf> [other files.pdf]"
+    echo
+    exit -1
+fi
+
+listfiles=
+while [ $# -gt 0 ]; do
+    item=$(printf '%q ' "$1")
+    listfiles="$listfiles $item"
+    shift
+done
+echo "LISTFILES ="
+echo "$listfiles"
+
+cmd="$cmd $listfiles"
+#echo "$cmd"
+$cmd
+
+#############################################################################################

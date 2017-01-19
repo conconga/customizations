@@ -1,0 +1,42 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \author       Nathan Miller 2008, nathan.andrew.miller@gmail.com                          #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script crops the white margin of a PDF file. It might be used when     #
+#               preparing graphs to include in a project, like LATEX text.                  #
+#               :: Warning! this script overwrites the original pdf with the cropped pdf    #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+# :: This batch file was created by Nathan Miller 2008, nathan.andrew.miller@gmail.com
+# :: dragging a pdf file over the batch file will automatically crop the pdf
+# ::
+# :: this script uses the following:
+# ::    pdftops (can get from xpdf at http://www.foolabs.com/xpdf/)
+# ::    ps2eps (http://www.tm.uka.de/%7Ebless/ps2eps)
+# ::    epstopdf (http://tug.ctan.org/tex-archive/support/epstopdf/)
+# ::
+
+[ "`which pdftops`x" = "x" ]  && { echo "'pdftops' NOT found! aborting ..";  exit -1; }
+[ "`which ps2eps`x" = "x" ]   && { echo "'ps2eps' NOT found! aborting ..";   exit -1; }
+[ "`which epstopdf`x" = "x" ] && { echo "'epstopdf' NOT found! aborting .."; exit -1; }
+
+while [ $# -gt 0 ]; do
+    suf=`echo $1 | sed 's/^.*\.//'`
+    base=`basename "$1" .$suf`
+    pdftops "$1"
+    ps2eps -l -f -B -s b0 -c -n -P "$base.ps"
+    epstopdf --nocompress "$base.eps"
+    shift
+done
+
+#############################################################################################
