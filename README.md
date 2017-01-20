@@ -14,5 +14,5 @@
 **sh_pdfcrop**...................crop white margin around a single page PDF file</br>
 **sh_pdfsplit**..................extracts each page of a PDF in a single file</br>
 **sh_svg2pdf**...................converts a list of SVG file into PDF files.</br>
-**sh_uniqfile**..................creates a unique filename for a given path.
+**sh_uniqfile**..................creates a unique filename for a given path.</br>
 **sh_utf2iso**...................converts a UTF-8 encoded file into a ISO8859-1 file.</br>
