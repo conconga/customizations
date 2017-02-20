@@ -1,0 +1,38 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script lists recursively all empty dirs in the tree.                   #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+if [ $# -eq 0 ]; then
+    echo
+    echo "Usage:"
+    echo "   `basename $0` <path_init_search>"
+    echo
+    exit -1
+fi
+
+if [ ! -d "$1" ]; then
+    echo "path to folder '$1' does NOT exist."
+    exit -1
+fi
+
+find "$1" -type d | while read nome; do
+    len=$(find "$nome" -mindepth 1 -maxdepth 1 | wc -l)
+    #echo "at '$nome', $len elements"
+    if [ $len -eq 0 ]; then
+        echo "$nome"
+    fi
+done
+
+#############################################################################################
