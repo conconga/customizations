@@ -95,7 +95,8 @@ set ruler
 set cmdheight=2
 
 " Print the line number in front of each line
-set number
+"set number
+set relativenumber
 
 " do not redraw while running macros (much faster) (LazyRedraw)
 set lazyredraw
