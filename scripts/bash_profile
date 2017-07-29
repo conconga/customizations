@@ -293,7 +293,7 @@ function fn_sysstatus
     cat /proc/mdstat | sed -n '/^[[:graph:]]\+.*:/{s/[[:blank:]]\+.*$//;p}' | \
         while read dev; do
             if [ `cat /proc/partitions | grep -c $dev` -gt 0 ]; then
-                cat /proc/mdstat | nl | grep "$dev.*:" | sed 's/^[[:blank:]]*\([0-9]\+\).*$/\1/' | \
+                cat /proc/mdstat | nl -b a | grep "$dev.*:" | sed 's/^[[:blank:]]*\([0-9]\+\).*$/\1/' | \
                     xargs -In expr n + 1 | \
                     while read n; do
                         txt=`cat /proc/mdstat | sed -n ${n}p | \grep -o "\[[^0-9]\+\]"`
