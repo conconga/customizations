@@ -1,0 +1,82 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script converts a JPG picture into a PDF file with A4 page size.       #
+#               The JPG picture is converted to gray and shrinked to create a white         #
+#               border around it.                                                           # 
+#               If the pdf-file argument is not provided, the script creates a file         #
+#               with name similar to the input jpg file.                                    #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+fn_usage() {
+    name=`basename "$0"`
+    echo
+    echo "Usage:"
+    echo
+    echo "   $name  <jpg-file>  [pdf-file]"
+    echo
+    exit -1
+}
+
+# verify dependencies:
+[ "`which python`x" = "x" ] && { echo "'python' NOT found! aborting..."; exit -1; }
+[ "`which convert`x" = "x" ] && { echo "'convert' NOT found! aborting..."; exit -1; }
+
+# verify #arguments:
+if [ $# -ne 1 -a $# -ne 2 ]; then
+    echo "invalid number of arguments!"
+    fn_usage
+fi
+
+# verify input file:
+[[ ! -e "$1" ]] && { echo "invalid input file"; fn_usage; }
+src="$1"
+
+# verify output file:
+if [ "$2"X = "X" ]; then
+    pdf=`echo "$src" | sed 's/\(\.[jJ][pP][gG]\)*$/.pdf/'`
+else
+    pdf="$2"
+fi
+echo "pdf file = $pdf"
+
+###################
+## configuration ##
+###################
+
+borderx=2 # cm
+bordery=2 # cm
+unit=PixelsPerInch
+dens=150
+dens=300
+pagesize=$((dens*827/100))x$((dens*1169/100))
+
+#res=`identify -verbose "$src" | grep "^[[:blank:]]*Resolution:.*x" | sed 's/^.*:[[:blank:]]*//'`
+#resx=`echo $res | sed 's/x.*$//'`
+#resy=`echo $res | sed 's/^.*x//'`
+#echo "resolution = $resx x $resy"
+
+resx=$dens
+resy=$dens
+dx=`python -c "print int(1.0 * $resx * $borderx / 2.54)"`
+dy=`python -c "print int(1.0 * $resy * $bordery / 2.54)"`
+#echo "dx = $dx"
+#echo "dy = $dy"
+
+convert "$src" -quality 100 \
+    -bordercolor White -border ${dx}x${dy} \
+    -resize $pagesize -gravity center -extent $pagesize \
+    -repage $pagesize -units $unit -density ${dens}x${dens} \
+    -colorspace Gray "$pdf"
+
+#############################################################################################
