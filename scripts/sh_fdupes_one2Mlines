@@ -1,0 +1,63 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+#                                                                                           #
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  Expands the one-line groups into multiples lines, as a regular output of    #
+#               fdupes.                                                                     #
+#                                                                                           #
+#               Use:                                                                        #
+#                 $ fdupes -s -r -o name <dirs>                                             #
+#                 $ sh_fdupes_Mlines2one name | sed -n '1p;/rules/p' | sh_fdupes_one2Mlines #
+#                 $ "$0" | sed -n '1p;/????/p'                                              #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+#                                                                                           #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+# This script rebuilds the blocks generated with 'fdupes' and converted to
+# one line format with 'sh_fdupes_Mlines2one'. It is used with a filter to
+# select particular combination of files and folders.
+#
+# Usage:
+#    cat <file> | sed -n '1p;/rules/p' | sh_fdupes_showblock
+#
+# where:
+#   file  :   file generated with 'sh_fdupes_Mlines2one'
+#   rules :   REGEX rules to filter blocks
+
+
+# The following solution reads from a file if the script is called with a file
+# name as the first parameter $1 otherwise from standard input.
+
+count=1
+while read line; \
+do
+    if [ $count == 1 ]; then
+        [ `echo "$line" | grep -c "^space"` -eq 0 ] && { echo "invalid data/file.. aborting."; exit -1; }
+        space=`echo $line | sed 's/^.*=//'`
+        count=$(( $count + 1 ))
+        continue
+    fi
+
+    #####################################
+    ## double check existence of files ##
+    #####################################
+    echo "$line" | sed "s/$space/\n/g" | while read onefile; \
+    do
+        [ ! -e "$onefile" ] && { echo "NOK: file '$onefile' not found..."; exit -1; }
+        echo "$onefile"
+    done
+
+    echo
+
+done < "${1:-/dev/stdin}"
+
+#############################################################################################

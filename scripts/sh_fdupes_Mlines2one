@@ -1,0 +1,81 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+#                                                                                           #
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  Converts a fdupes-log-file with a group of lines into one-line groups to    #
+#               allow filtering based on the whole group.                                   #
+#                                                                                           #
+#               Use:                                                                        #
+#                 $ fdupes -s -r -o name <dirs>                                             #
+#                 $ "$0" name | sed -n '1p;/????/p'                                         #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+#                                                                                           #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+
+# $1: <file> criado pelo 'fdupes' em multiplas linhas
+#
+# Este script converte o arquivo <file> em grupos de uma linha para
+# facilitar testes (se um arquivo aparece em especificas pastas).
+#
+# $ fdupes -s -r -o name <dirs>
+#
+# output em <stdout>, primeira linha com o modelo de texto separando arquivos.
+
+space="lsdfkjsdlfkjsrteoireoiuervxncvkdfjsdkjlskdf"
+block=
+count=1
+
+[ ! -e "$1" ] && { echo "file '$1' does not exist. Aborting..."; exit -1; }
+
+cat "$1" | while read line; \
+do
+    if [ `echo "$line" | grep -c "^[[:blank:]]*$"` -ge 1 ]; then
+        #echo "----- new block: -----"
+        #echo "$block"
+        #echo
+
+        #####################################
+        ## double check existence of files ##
+        #####################################
+        #echo "$block" | sed "s/$space/\n/g" | while read onefile; \
+        #do
+        #    [ ! -e "$onefile" ] && echo "NOK: file '$onefile' not found..."
+        #done
+
+        #######################
+        ## show space string ##
+        #######################
+        [ $count == 1 ] && echo "space=$space"
+
+        ###########################################
+        ## show the current block with a counter ##
+        ###########################################
+        #echo "$count   $block"
+        echo "$block"
+        count=$(( $count + 1 ))
+
+        ##############################
+        ## reset a variavel "block" ##
+        ##############################
+        block=
+
+    else
+        if [ ${#block} -gt 0 ]; then
+            block=`echo "${block}${space}$line"`
+        else
+            block=`echo "$line"`
+        fi
+    fi
+done
+
+#############################################################################################
