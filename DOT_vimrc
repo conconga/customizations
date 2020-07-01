@@ -51,7 +51,7 @@ syntax enable
 " Load color scheme from ~/.vim/colors
 " http://www.vim.org/scripts/script.php?script_id=985
 " # colorscheme metacosm
-colorscheme turbo
+"colorscheme turbo
 colorscheme torte
 "colorscheme koehler
 "colorscheme maroloccio
@@ -95,8 +95,8 @@ set ruler
 set cmdheight=2
 
 " Print the line number in front of each line
-"set number
 set relativenumber
+set number
 
 " do not redraw while running macros (much faster) (LazyRedraw)
 set lazyredraw
@@ -204,6 +204,10 @@ set expandtab
 
 " do not wrap lines
 set nowrap
+
+" or wrap lines:
+"set wrap
+au BufRead,BufNewFile *.txt,*.tex,*.md set wrap linebreak nolist textwidth=0 wrapmargin=0
 
 " use tabs at the start of a line, spaces elsewhere
 "set smarttab

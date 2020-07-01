@@ -15,6 +15,15 @@
 ###########                                                                       ###########
 #############################################################################################
 
+# bash does not source ~/.bashrc when started in interative mode.
+# if running bash
+
+if [ -n "$BASH_VERSION" ]; then
+    # include .bashrc if it exists
+    if [ -f "$HOME/.bashrc" ]; then
+        . "$HOME/.bashrc"
+    fi
+fi
 
 #############################################################################################
 ###########                                                                       ###########
@@ -138,6 +147,7 @@ fi
 ###########                                                                       ###########
 #############################################################################################
 
+alias ls='ls --color=auto --group-directories-first -X'
 alias ll='ls -l'
 alias la='ls -al'
 alias grep='grep --color=auto'
@@ -148,6 +158,10 @@ alias vv='git branch -vv'
 alias avv='git branch -avv'
 alias mpirun='LD_PRELOAD="/home/local/lib/libmpi.so $LD_PRELOAD" mpirun'
 alias pp='ps faux | less'
+alias lg1='git log --graph --abbrev-commit --decorate --format=format:"%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)" --all'
+alias lg2='git log --graph --abbrev-commit --decorate --format=format:"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset) %C(dim white)- %an%C(reset)" --all'
+
+
 
 #############################################################################################
 ###########                                                                       ###########
@@ -318,5 +332,8 @@ function fn_sysstatus
 #############################################################################################
 
 fn_sysstatus
+
+# bash as vi?
+set -o vi
 
 #############################################################################################
