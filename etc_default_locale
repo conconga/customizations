@@ -1,0 +1,7 @@
+#LANG="C"
+LANG=de_DE
+LANGUAGE="de_DE"
+LC_CTYPE="pt_BR.UTF-8"
+LC_ALL="de_DE.UTF-8"
+GTK_IM_MODULE=cedilla
+QT_IM_MODULE=cedilla
