@@ -224,8 +224,8 @@ set modeline
 " Turn on folding
 set foldenable
 
-" Make folding indent sensitive
-set foldmethod=indent
+" Make folding manual (zf, zo, zr, zR, ...)
+set foldmethod=manual
 
 " Don't autofold anything (but I can still fold manually)
 set foldlevel=100
@@ -235,6 +235,9 @@ set foldopen-=search
 
 " don't open folds when you undo stuff
 set foldopen-=undo
+
+" max nesting:
+set foldnestmax=10
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Spelling
