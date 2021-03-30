@@ -162,6 +162,8 @@ alias lg1='git log --graph --abbrev-commit --decorate --format=format:"%C(bold b
 alias lg2='git log --graph --abbrev-commit --decorate --format=format:"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset) %C(dim white)- %an%C(reset)" --all'
 alias attach='tmux attach'
 
+
+
 #############################################################################################
 ###########                                                                       ###########
 ######                                                                                 ######
@@ -332,7 +334,28 @@ function fn_sysstatus
 
 fn_sysstatus
 
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                          #
+# \brief  [Raspberry Pi] Show current connected devices to hostapd.                         #
+#                                                                                           #
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+# sudo fn_get_connections wlan0
+fn_get_connections()
+{
+    iw dev $1 station dump | grep "^Station" | grep -o "\([0-9a-f]\{2\}:\)\+[0-9a-f]\{2\}" | \
+        while read mac; do arp -i $1 | grep "$mac"; done
+}
+
+#############################################################################################
 # bash as vi?
 set -o vi
 
-#############################################################################################
