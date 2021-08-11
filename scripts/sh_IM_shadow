@@ -6,7 +6,7 @@
 # \author       Luciano Augusto Kruk                                                        #
 # \web          www.kruk.eng.br                                                             #
 #                                                                                           #
-# \description  This script removes strong shadows from scanned images.                     #
+# \description  This script remove strong shadows from scanned images.                      #
 #                                                                                           #
 # \copyright    Please keep this head when you distribute this script.                      #
 ##                                                                                         ##
@@ -31,4 +31,3 @@ fi
 
 convert "$1" \( -clone 0 -colorspace Gray -blur 0x100 \) +swap -compose divide -composite "$new"
 
-#############################################################################################

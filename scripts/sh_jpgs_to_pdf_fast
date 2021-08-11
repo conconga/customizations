@@ -1,0 +1,77 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script converts several jpgs into a single pdf file.                   #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+if [ $# -eq 0 ]; then
+    echo
+    echo "Usage:"
+    echo "   `basename $0` <out.pdf> <jpg_1> [ [jpg_2] ... ]"
+    echo
+    exit -1;
+fi
+
+apps=( 'sh_uniqfile' 'sh_IM_shadow' 'sh_pdfcat' )
+for app in ${apps[@]};
+do
+    [ "`which ${app}`x" = "x" ] && { echo "ERR: application '${app}' not found. Aborting..."; exit -1; }
+done
+
+outfile="$1"
+shift
+
+list_shadow="`sh_uniqfile .`"
+touch ${list_shadow}
+list_pdf="`sh_uniqfile .`"
+touch ${list_pdf}
+
+while [ $# -gt 0 ]; do
+    [ ! -e "$1" ] && { echo "file '$1' not found. Aborting..."; exit -1; }
+
+    tmpshadow="`sh_uniqfile .`"
+    tmppdf="${tmpshadow}.pdf"
+
+    # shadow:
+    echo ". shadowing '$1'..."
+    sh_IM_shadow "$1" "${tmpshadow}"
+    echo "${tmpshadow}" >> ${list_shadow}
+
+    # jpg to pdf:
+    unit=PixelsPerInch
+    dens=100
+    #dens=200
+    pagesize=$((dens*827/100))x$((dens*1169/100))
+
+    echo ". creating pdf from '$1'..."
+    convert "${tmpshadow}" -compress jpeg -quality 100                \
+        -resize $pagesize -gravity center -extent $pagesize \
+        -repage $pagesize -units $unit -density ${dens}x${dens} "${tmppdf}"
+    echo "${tmppdf}" >> ${list_pdf}
+
+    shift
+done
+
+# pdf cat:
+if [ `cat "${list_pdf}" | wc -l` -gt 1 ]; then
+    cat "${list_pdf}" | xargs sh_pdfcat "${outfile}" 
+else
+    cat "${list_pdf}" | xargs -Inome mv -v "nome" "${outfile}"
+fi
+
+# cleaning:
+cat "${list_shadow}" | xargs rm -fv
+cat "${list_pdf}"    | xargs rm -fv
+rm -fv "${list_shadow}" "${list_pdf}"
+
+#############################################################################################
