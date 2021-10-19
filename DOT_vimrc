@@ -336,10 +336,16 @@ map :Wq :wq
 if &diff
 	map <F9> [c
 	map <F10> ]c
+    map \R :diffget RE<cr>
+    map \L :diffget LO<cr>
+    map \B :diffget BA<cr>
 else
 	map <F9> :cN<CR>
 	map <F10> :cn<CR>
 endif
+
+" git merge conflicts:
+nnoremap <leader>gm /\v^\<\<\<\<\<\<\< \|\=\=\=\=\=\=\=$\|\>\>\>\>\>\>\> /<cr>
 
 " buffer list:
 map <S-F11> :ls<CR>
