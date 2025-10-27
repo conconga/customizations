@@ -14,6 +14,13 @@
 ######                                                                                 ######
 ###########                                                                       ###########
 #############################################################################################
+####  IMPORTANT:                                                                         ####
+####     1) comment the whole content in ~/.bashrc                                       ####
+####     2) edit /etc/profile and add your changes to PATH there.                        ####
+####     3) hint: to support python virtual environment, venv, use:                      ####
+####          if [[ -v VIRTUAL_ENV ]]; then                                              ####
+####              ....                                                                   ####
+#############################################################################################
 
 # bash does not source ~/.bashrc when started in interative mode.
 # if running bash
@@ -66,7 +73,11 @@ if [ "$USER" = "root" ]
 then
 	PS1=$'\[\e[31;1m\]\xe2\x94\x8c\xe2\x94\x80(\[\e[31;1m\]\u\[\e[36;1m\]@\[\e[33;1m\]\h\[\e[31;1m\])\xe2\x94\x80\xe2\x94\x80(\[\e[0;37m\]\w\[\e[31;1m\])\[\e[34;1m\]\xe2\x94\x80\xe2\x94\x80(`fn_gitbranch`)\n\[\e[31;1m\]\xe2\x94\x94\xe2\x94\x80\\[\e[36;1m\]>>\[\e[0m\] # '  
 else
-	PS1=$'\[\e[32;1m\]\xe2\x94\x8c\xe2\x94\x80(\[\e[32;1m\]\u\[\e[36;1m\]@\[\e[33;1m\]\h\[\e[32;1m\])\xe2\x94\x80\xe2\x94\x80(\[\e[0;37m\]\w\[\e[32;1m\])\[\e[34;1m\]\xe2\x94\x80\xe2\x94\x80(`fn_gitbranch`)\n\[\e[32;1m\]\xe2\x94\x94\xe2\x94\x80\\[\e[36;1m\]>>\[\e[0m\] $ '  
+    if [ -v VIRTUAL_ENV ]; then
+        PS1=$'(\[\e[32;1m\]\u\[\e[36;1m\]@\[\e[33;1m\]\h\[\e[32;1m\])\xe2\x94\x80\xe2\x94\x80(\[\e[0;37m\]\w\[\e[32;1m\])\[\e[34;1m\]\xe2\x94\x80\xe2\x94\x80(`fn_gitbranch`)\n\[\e[36;1m\]${VIRTUAL_ENV_PROMPT}>>\[\e[0m\] $ '  
+    else
+        PS1=$'\[\e[32;1m\]\xe2\x94\x8c\xe2\x94\x80(\[\e[32;1m\]\u\[\e[36;1m\]@\[\e[33;1m\]\h\[\e[32;1m\])\xe2\x94\x80\xe2\x94\x80(\[\e[0;37m\]\w\[\e[32;1m\])\[\e[34;1m\]\xe2\x94\x80\xe2\x94\x80(`fn_gitbranch`)\n\[\e[32;1m\]\xe2\x94\x94\xe2\x94\x80\\[\e[36;1m\]>>\[\e[0m\] $ '  
+    fi
 fi
 
 #############################################################################################
@@ -152,15 +163,23 @@ alias ll='ls -l'
 alias la='ls -al'
 alias grep='grep --color=auto'
 alias top='top -Hd1'
-alias ta='sudo tail -f /var/log/syslog'
-alias octave='octave -q'
+#alias ta='sudo journalctl -f'
+alias ta='sudo dmesg -w'
 alias vv='git branch -vv'
 alias avv='git branch -avv'
+alias sudo='sudo '
 alias mpirun='LD_PRELOAD="/home/local/lib/libmpi.so $LD_PRELOAD" mpirun'
 alias pp='ps faux | less'
 alias lg1='git log --graph --abbrev-commit --decorate --format=format:"%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)" --all'
 alias lg2='git log --graph --abbrev-commit --decorate --format=format:"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset) %C(dim white)- %an%C(reset)" --all'
-alias RsyncPartial='rsync -av -hh --relative --delete --delete-before --delete-excluded -z --compress-level=9 --perms --chmod=Du+x --partial --append-verify --info=progress12 '
+alias RsyncNoDelete='rsync -av -H -hh --relative -H -z --compress-level=9 --perms --chmod=Du+x --info=progress12 '
+alias RsyncDelete='RsyncNoDelete --delete --delete-before --delete-excluded '
+alias RsyncDelPartial='RsyncDelete --partial --append-verify '
+alias Du='ls -a1 | grep "^\.[^.]\|^[^.]" | while read nome; do echo "\"${nome}\""; done | xargs du -sch | grep "[0-9][GM]"'
+alias Sshfs='sshfs -o reconnect,workaround=truncate:rename,idmap=user,ServerAliveInterval=10,ServerAliveCountMax=2,ConnectTimeout=5 '
+alias DuSudo='ls -1a | grep -v "[.]\{1,\}$" | sed "s/^/\"/;s/$/\"/" | xargs sudo du -sch | grep "[0-9][GM]"'
+alias movieInfo='mplayer -vo null -ao null -frames 0 -identify '
+alias fancy='lxc-ls --fancy'
 
 #############################################################################################
 ###########                                                                       ###########
@@ -178,7 +197,7 @@ alias RsyncPartial='rsync -av -hh --relative --delete --delete-before --delete-e
 
 function sudo-sshfs ()
 {
-	[ $# -eq 0 ] && { echo "sudo-sshfs [options] [user@]host:[dir] mountpoint"; return; }
+	[ $# -eq 0 ] && { echo "sudo-sshfs [options] [user@]host:[dir] mountpoint"; echo "    sudo-sshfs -F <ssh_configfile>: specifies alternative ssh configuration file"; return; }
 	[ "`which sshfs`X" = X ] && { echo "no sshfs binary found in path"; return; }
 
 	args=
@@ -187,7 +206,7 @@ function sudo-sshfs ()
 		shift
 	done
 	#echo "args = $args"
-	sudo sshfs $args -o reconnect,workaround=truncate:rename,allow_other
+	sudo sshfs -o reconnect,workaround=truncate:rename,allow_other ${args}
 }
 
 #############################################################################################
@@ -301,8 +320,21 @@ function ledict ()
 ###########                                                                       ###########
 #############################################################################################
 
+function fn_sysstatus_1 ()
+{
+    [[ `which lxc-ls`X == "X" ]] || { lxc-ls --fancy | sed -n '1p;/RUNNING/p'; }
+}
+
+function fn_sysstatus_2 ()
+{
+    [[ `which tmux`X == "X" ]] || { tmux list-sessions 2> /dev/null ; }
+}
+
 function fn_sysstatus
 {
+    [[ `fn_sysstatus_1 | wc -l` -gt 1 ]] && { fn_sysstatus_1; echo; }
+    [[ `fn_sysstatus_2 | wc -l` -ge 1 ]] && { echo "TMUX SESSIONS:"; fn_sysstatus_2; echo; }
+
     cat /proc/mdstat | sed -n '/^[[:graph:]]\+.*:/{s/[[:blank:]]\+.*$//;p}' | \
         while read dev; do
             if [ `cat /proc/partitions | grep -c $dev` -gt 0 ]; then
@@ -354,5 +386,39 @@ fn_get_connections()
 }
 
 #############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                          #
+# \brief  LOCALEs                                                                           #
+#                                                                                           #
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+export LC_NUMERIC=de_DE.UTF-8
+export LC_TIME=de_DE.UTF-8
+export LC_COLLATE="de_DE.utf8"
+export LC_MONETARY=de_DE.UTF-8
+export LC_MESSAGES="de_DE.utf8"
+export LC_PAPER=de_DE.UTF-8
+export LC_NAME=de_DE.UTF-8
+export LC_ADDRESS=de_DE.UTF-8
+export LC_TELEPHONE=de_DE.UTF-8
+export LC_MEASUREMENT=de_DE.UTF-8
+export LC_IDENTIFICATION=de_DE.UTF-8
+#LANG="C"
+export LANG=de_DE.utf8
+export LANGUAGE="de_DE"
+export LC_CTYPE="pt_BR.UTF-8"
+export LC_ALL="de_DE.UTF-8"
+export GTK_IM_MODULE=cedilla
+export QT_IM_MODULE=cedilla
+
+#############################################################################################
 # bash as vi?
 set -o vi
+#############################################################################################
