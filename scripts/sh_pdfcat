@@ -16,6 +16,7 @@
 
 cmd="                                          \
 gs                                             \
+-dSAFER                                        \
 -sDEVICE=pdfwrite                              \
 -dAntiAliasColorImage=false                    \
 -dAntiAliasGrayImage=false                     \
