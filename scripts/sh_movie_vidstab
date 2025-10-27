@@ -1,0 +1,562 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  Video Stabilizer.                                                           #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+thisfile=`basename "$0"`
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    ${thisfile} [options] <input_movie>"
+    echo
+    echo " Arguments:"
+    echo "   -h        this help information"
+    echo "   -o n      [n=0]   toggles optimal zoom (n is 0:disable, 1:static, 2:adaptive)"
+    echo "   -z n      [n=0.5] sets zoomspeed (valid when optimal-zoom > 0) ( 0.0 < n < 5.0% )"
+    echo "   -s n      [n=30]  sets the number of frames (n*2 + 1) used for lowpass filtering the camera movements"
+    echo "   -c n      [n=0]   crop configuration (n is 0:keep image; 1:fill the border with black)"
+    echo "   -x n      [n=0.3] sets minimum contrast (0.0 < n < 1.0)"
+    echo "   -q n      [n=2]   video quality (1(best) <= n <= 31(lowest))"
+    echo "   -m        toggles mix-output on"
+    echo "   -n        toggles audio-normalization on"
+    echo "   -O name   sets the output filename to 'name'"
+    echo
+}
+
+########################
+## internal functions ##
+########################
+
+# $1: arquivo para extrair os frames
+# $2: diretorio destino
+fn_extract_2_dir()
+{
+	if [ ! -e "$2" ]; then
+		mkdir "$2"
+	fi
+	(cd "$2"; mplayer -vo jpeg -nosound "../$1")
+}
+
+# recover a parameter from a video:
+# $1: filename
+# $2: parameter name
+fn_get_parameter()
+{
+	mplayer -vo null -ao null -frames 0 -identify "$1" 2>/dev/null | grep "$2" | \
+		tail -n1 | sed 's/^.*=\([0-9.]*\).*$/\1/'
+}
+
+# check for necessary apps:
+list_apps=( ffmpeg mplayer mencoder convert dialog python3 sh_uniqfile sh_movie_normalizeAudio )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+[[ $# -eq 0 ]] && { fn_usage ; exit -1 ; }
+#[[ ! -e "$1" ]] && { echo "File '$1' not found. Aborting ..."; exit -1; }
+#inputfile="$1"
+
+get_optzoom()
+{
+    optzoom=$( dialog --item-help --erase-on-exit --nocancel --menu "Zoom Options" 0 0 0 \
+        "0" "disabled" "" \
+        "1" "static"   "optimal static zoom value is determined (only very strong movements will lead to visible borders)" \
+        "2" "adaptive" "optimal adaptive zoom value is determined (no borders will be visible)" \
+        2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    echo "${optzoom}"
+}
+
+
+get_zoomspeed()
+{
+    zoomspeed=$( dialog --erase-on-exit --nocancel --inputbox "ZoomSpeed: set percent to zoom maximally each frame; range is from 0 to 5" 0 0 \
+        "0.5" \
+        2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    echo "${zoomspeed}"
+}
+
+
+get_smoothing()
+{
+    smoothing=$( dialog --erase-on-exit --nocancel --inputbox "
+        Smoothing: set the number of frames (value*2 + 1) used for lowpass
+        filtering the camera movements. Default value is 10.  For example a number
+        of 10 means that 21 frames are used (10 in the past and 10 in the future)
+        to smoothen the motion in the video. A larger value leads to a smoother
+        video, but limits the acceleration of the camera (pan/tilt movements). 0 is
+        a special case where a static camera is simulated." 0 0 \
+            "30" \
+            2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    echo "${smoothing}"
+}
+
+
+get_crop()
+{
+    crop=$( dialog --item-help --erase-on-exit --nocancel --menu "Crop: Specify how to deal with borders that may be visible due to movement compensation." 0 0 0 \
+        "0" "keep"  "keep image information from previous frame" \
+        "1" "black" "fill the border black" \
+        2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    case ${crop} in
+        0)
+            echo "keep"
+            ;;
+        1)
+            echo "black"
+            ;;
+    esac
+}
+
+get_mix()
+{
+    mix=$( dialog --erase-on-exit --nocancel --menu "Generate mix-movie?" 0 0 0 \
+        "0" "no" \
+        "1" "yes" \
+        2>&1 > /dev/tty )
+    echo "${mix}"
+}
+
+get_mincontrast()
+{
+    mincontrast=$( dialog --erase-on-exit --nocancel --inputbox "
+        Set minimum contrast. Below this value a local measurement field is
+        discarded. Must be a floating point value in the range 0-1." 0 0 "0.3" \
+        2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    echo "${mincontrast}"
+}
+
+get_qscale()
+{
+    qscale=$( dialog --erase-on-exit --nocancel --inputbox "
+        You can select a video quality level with a number from 1-31, with 1 being
+        highest quality/largest filesize and 31 being the lowest quality/smallest
+        filesize. This is a variable bit rate mode." 0 0 \
+            "2" \
+            2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    python3 -c "print('{:0.0f}'.format(${qscale}))"
+}
+
+get_audionormalization()
+{
+    audionorm=$( dialog --item-help --erase-on-exit --nocancel --menu "Sets post-processing: audio-normalization." 0 0 0 \
+        "0" "no"  "it does not perform audio-normalization." \
+        "1" "yes" "it normalizes the audio stream." \
+        2>&1 > /dev/tty )
+    retval=$?
+    [[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+    echo "${audionorm}"
+}
+
+
+
+# vidstabdetect filter:
+#  result
+#      Set the path to the file used to write the transforms information. Default
+#      value is transforms.trf. 
+#
+#  shakiness
+#      Set how shaky the video is and how quick the camera is. It accepts an
+#      integer in the range 1-10, a value of 1 means little shakiness, a value of
+#      10 means strong shakiness. Default value is 5. 
+#
+#  accuracy
+#      Set the accuracy of the detection process. It must be a value in the range
+#      1-15. A value of 1 means low accuracy, a value of 15 means high accuracy.
+#      Default value is 15. 
+#
+#  stepsize
+#      Set stepsize of the search process. The region around minimum is scanned
+#      with 1 pixel resolution. Default value is 6. 
+#
+#  mincontrast
+#      Set minimum contrast. Below this value a local measurement field is
+#      discarded. Must be a floating point value in the range 0-1. Default value
+#      is 0.3. 
+#
+#  tripod
+#      Set reference frame number for tripod mode. 
+#      If enabled, the motion of the frames is compared to a reference frame in
+#      the filtered stream, identified by the specified number. The idea is to
+#      compensate all movements in a more-or-less static scene and keep the camera
+#      view absolutely still. 
+#
+#      If set to 0, it is disabled. The frames are counted starting from 1. 
+#
+#  show
+#      Show fields and transforms in the resulting frames. It accepts an integer
+#      in the range 0-2. Default value is 0, which disables any visualization.
+
+
+# vidstabtransform filter:
+# 
+# input
+#     Set path to the file used to read the transforms. Default value is
+#     transforms.trf. 
+# 
+# smoothing
+#     Set the number of frames (value*2 + 1) used for lowpass filtering the
+#     camera movements. Default value is 10.  For example a number of 10 means
+#     that 21 frames are used (10 in the past and 10 in the future) to smoothen
+#     the motion in the video. A larger value leads to a smoother video, but
+#     limits the acceleration of the camera (pan/tilt movements). 0 is a special
+#     case where a static camera is simulated. 
+# 
+# optalgo
+#     Set the camera path optimization algorithm. 
+#     Accepted values are: 
+# 
+#         ‘gauss’
+#         gaussian kernel low-pass filter on camera motion (default) 
+# 
+#         ‘avg’
+#         averaging on transformations 
+# 
+# maxshift
+#     Set maximal number of pixels to translate frames. Default value is -1,
+#     meaning no limit. 
+# 
+# maxangle
+#     Set maximal angle in radians (degree*PI/180) to rotate frames. Default
+#     value is -1, meaning no limit. 
+# 
+# crop
+#     Specify how to deal with borders that may be visible due to movement
+#     compensation. 
+#     Available values are: 
+#         ‘keep’
+#         keep image information from previous frame (default) 
+# 
+#         ‘black’
+#         fill the border black 
+# 
+# invert
+#     Invert transforms if set to 1. Default value is 0. 
+# 
+# relative
+#     Consider transforms as relative to previous frame if set to 1, absolute if
+#     set to 0. Default value is 0. 
+# 
+# zoom
+#     Set percentage to zoom. A positive value will result in a zoom-in effect, a
+#     negative value in a zoom-out effect. Default value is 0 (no zoom). 
+# 
+# optzoom
+#     Set optimal zooming to avoid borders. 
+#     Accepted values are: 
+# 
+#         ‘0’
+#         disabled 
+# 
+#         ‘1’
+#         optimal static zoom value is determined (only very strong movements will
+#         lead to visible borders) (default) 
+# 
+#         ‘2’
+#         optimal adaptive zoom value is determined (no borders will be visible), see
+#         zoomspeed 
+# 
+#     Note that the value given at zoom is added to the one calculated here. 
+# 
+# zoomspeed
+#     Set percent to zoom maximally each frame (enabled when optzoom is set to
+#     2). Range is from 0 to 5, default value is 0.25. 
+# 
+# interpol
+#     Specify type of interpolation. 
+#     Available values are: 
+# 
+#         ‘no’
+#         no interpolation 
+# 
+#         ‘linear’
+#         linear only horizontal 
+# 
+#         ‘bilinear’
+#         linear in both directions (default) 
+# 
+#         ‘bicubic’
+#         cubic in both directions (slow) 
+# 
+# tripod
+#     Enable virtual tripod mode if set to 1, which is equivalent to
+#     relative=0:smoothing=0. Default value is 0. 
+#     Use also tripod option of vidstabdetect. 
+# 
+# debug
+#     Increase log verbosity if set to 1. Also the detected global motions are
+#     written to the temporary file global_motions.trf. Default value is 0.
+
+# versao antiga, com transcode:
+# transcode -J stabilize=fieldsize=50 -i "$1" 2>&1
+# transcode -J transform=smoothing=30=sharpen=1 -i "$1" -y xvid4 -o "${stable}"
+
+
+
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK"
+optzoom=${defans}
+zoomspeed=${defans}
+smoothing=${defans}
+crop=${defans}
+mincontrast=${defans}
+qscale=${defans}
+mix=${defans}
+audionorm=${defans}
+inputfile=${defans}
+outputfile=${defans}
+
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hmno:z:s:c:x:O:q:" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            o)
+                optzoom=${OPTARG}
+                ;;
+            z)
+                zoomspeed=${OPTARG}
+                ;;
+            s)
+                smoothing=${OPTARG}
+                ;;
+            c)
+                crop=${OPTARG}
+                ;;
+            x)
+                mincontrast=${OPTARG}
+                ;;
+            q)
+                qscale=${OPTARG}
+                ;;
+            m)
+                mix=1
+                ;;
+            n)
+                audionorm=1
+                ;;
+            O)
+                outputfile=${OPTARG}
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        [[ ! -e "${!OPTIND}" ]] && { echo "File '${!OPTIND}' not found. Aborting ..."; exit -1; }
+        [[ ${inputfile} != ${defans} ]] && { echo "Only one input file is acceptable!. Aborting..."; fn_usage; exit -1; }
+        inputfile="${!OPTIND}"
+        ((OPTIND++))
+    fi
+done
+
+[[ ${optzoom} == ${defans} ]]                         && optzoom=`get_optzoom`
+[[ ${optzoom} -ne "0" && ${zoomspeed} == ${defans} ]] && zoomspeed=`get_zoomspeed`
+[[ ${smoothing} == ${defans} ]]                       && smoothing=`get_smoothing`
+[[ ${crop} == ${defans} ]]                            && crop=`get_crop`
+[[ ${mincontrast} == ${defans} ]]                     && mincontrast=`get_mincontrast`
+[[ ${qscale} == ${defans} ]]                          && qscale=`get_qscale`
+[[ ${mix} == ${defans} ]]                             && mix=`get_mix`
+[[ ${audionorm} == ${defans} ]]                       && audionorm=`get_audionormalization`
+[[ ${inputfile} == ${default} ]]                      && { echo "No input filename defined! Aborting..."; fn_usage; exit -1; }
+
+# report:
+if [[ 0 == 0 ]]; then
+    echo "optzoom     = ${optzoom}"
+    echo "zoomspeed   = ${zoomspeed}%"
+    echo "smoothing   = ${smoothing}"
+    echo "crop        = ${crop}"
+    echo "mincontrast = ${mincontrast}"
+    echo "qscale      = ${qscale}"
+    echo "mix         = ${mix}"
+    echo "audionorm   = ${audionorm}"
+    echo -n "cmdline arguments ="
+    echo -e -n "\e[1;35;7;47m"
+    echo -n " -o${optzoom}"
+    echo -n " -z${zoomspeed}"
+    echo -n " -s${smoothing}"
+    echo -n " -c${crop}"
+    echo -n " -x${mincontrast}"
+    echo -n " -q${qscale}"
+    [[ ${mix} == ${defans} ]] || echo -n " -m"
+    [[ ${audionorm} == ${defans} ]] || echo -n " -n"
+    echo -e -n "\e[0m"
+fi
+
+ext=`echo "${optzoom}-${zoomspeed}-${smoothing}-${crop}-${mincontrast}-${qscale}"`
+base=`echo "${inputfile}" | sed 's/\.[[:alnum:]]*$//'`
+base="${base}-${ext}"
+suffix=`echo "${inputfile}" | sed 's/^.*\.\([[:alnum:]]*\)$/\1/'`
+transform=`echo "${base}.trf"`
+dummy=`echo "DUMMY-${base}.mp4"`
+stable="${base}.stable.${suffix}"
+diroriginal="${inputfile}.original"
+dirstable="${inputfile}.stable"
+audio="${diroriginal}/audio.wav"
+echo
+echo "base = \"${base}\"; suffix = \"${suffix}\""
+echo
+
+if [ "${outputfile}" != ${defans} ]; then
+    stable="${outputfile}"
+fi
+
+if [ 1 == 1 ]; then
+    echo
+    echo "inputfile   = ${inputfile}"
+    echo "ext         = ${ext}"
+    echo "base        = ${base}"
+    echo "suffix      = ${suffix}"
+    echo "transform   = ${transform}"
+    echo "dummy       = ${dummy}"
+    echo "stable      = ${stable}"
+    echo "diroriginal = ${diroriginal}"
+    echo "dirstable   = ${dirstable}"
+    echo "audio       = ${audio}"
+    echo
+fi
+
+#############
+## PASS 1: ##
+#############
+ffmpeg -i "${inputfile}" -y -vf vidstabdetect=result="${transform}":show=1:shakiness=10:accuracy=15:mincontrast=${mincontrast} -an -qscale:v "${qscale}" "${dummy}"
+
+#############
+## PASS 2: ##
+#############
+metadata=' -metadata artist= -metadata copyright= -metadata isrc= '
+case ${optzoom} in
+    0)
+        ffmpeg -i "${inputfile}" -y ${metadata} -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:optzoom=0:crop=${crop},unsharp=5:5:0.8:3:3:0.4 \
+            -crf 15 -qscale:v "${qscale}" -preset veryslow -c:a copy "${stable}"
+        ;;
+    1)
+        ffmpeg -i "${inputfile}" -y ${metadata} -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:zoomspeed=${zoomspeed}:optzoom=1:crop=${crop},unsharp=5:5:0.8:3:3:0.4 \
+            -crf 15 -qscale:v "${qscale}" -preset veryslow -c:a copy "${stable}"
+        ;;
+    2)
+        #ffmpeg -i "${inputfile}" -y -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:crop=${crop},unsharp=5:5:0.8:3:3:0.4 "${stable}"
+        #ffmpeg -i "${inputfile}" -y -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:crop=${crop},unsharp=5:5:0.8:3:3:0.4 "${stable}"
+        #ffmpeg -i "${inputfile}" -y -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:zoomspeed=0.9:optzoom=2:crop=${crop},unsharp=5:5:0.8:3:3:0.4 "${stable}"
+        ffmpeg -i "${inputfile}" -y ${metadata} -vf vidstabtransform=input="${transform}":smoothing=${smoothing}:zoomspeed=${zoomspeed}:optzoom=2:crop=${crop},unsharp=5:5:0.8:3:3:0.4 \
+            -crf 15 -qscale:v "${qscale}" -preset veryslow -c:a copy "${stable}"
+        ;;
+esac
+rm -rf "${transform}" "${dummy}"
+
+#########################
+## audio normalization ##
+#########################
+if [ ${audionorm} == 1 ]; then
+    sh_movie_normalizeAudio -c "${stable}"
+fi
+
+##########
+## MIX: ##
+##########
+
+if [ ${mix} == "1" ]; then
+    ffmpeg -i "${inputfile}" -i "${stable}" -filter_complex "[0:v]crop=iw/2:ih:0:0[a];[1:v]crop=iw/2:ih:iw/2-1:0[b];[a][b]hstack=inputs=2" \
+        -vsync vfr -crf 15 -qscale:v "${qscale}" -preset veryslow -c:a copy "${base}.mix.${suffix}"
+fi
+
+##############
+## Old MIX: ##
+##############
+
+if [ 1 == 0 ]; then
+    echo "6"
+    # extract audio from original movie:
+    mkdir -p "${diroriginal}"
+    mplayer -ao pcm:file="${audio}" -vc dummy -vo null "${inputfile}"
+
+    # extract frames from original movie:
+    fn_extract_2_dir "${inputfile}" "${diroriginal}"
+    fn_extract_2_dir "${stable}" "${dirstable}"
+
+    # create images with half part from original and half from stable:
+    dirmix="${inputfile}.mix"
+    if [ ! -e "${dirmix}" ]; then
+        mkdir "${dirmix}"
+    fi
+
+    (cd "${diroriginal}"; ls -1) | while read file;
+    do
+        base=`echo "${file}" | sed 's/\.[^.]*$//'`
+        suffix=`echo "${file}" | sed 's/^.*\.\([^.]*\)$/\1/'`
+        file1="${diroriginal}/${file}"
+        file2="${dirstable}/${file}"
+        file3="${dirmix}/${file}"
+        file3a="${dirmix}/${base}.a.${suffix}"
+        file3b="${dirmix}/${base}.b.${suffix}"
+        [ ! -f "${file1}" ] || [ ! -f "${file2}" ] && continue
+
+        echo "mixing \"${file1}\" and \"${file2}\" ..."
+        # halves parts:
+        convert "${file1}" -gravity NorthWest -crop 50x100%+0+0 "${file3a}"
+        convert "${file2}" -gravity NorthEast -crop 50x100%+0+0 "${file3b}"
+        # putting together:
+        convert +append "${file3a}" "${file3b}" "${file3}"
+        rm -f "${file3a}" "${file3b}"
+    done
+
+    # at this point, all pictures for the next movie are available in ${dirmix}
+    # now, get parameters for the new movie:
+    ID_VIDEO_BITRATE=`fn_get_parameter "${inputfile}" ID_VIDEO_BITRATE`
+    ID_VIDEO_WIDTH=`fn_get_parameter "${inputfile}" ID_VIDEO_WIDTH`
+    ID_VIDEO_HEIGHT=`fn_get_parameter "${inputfile}" ID_VIDEO_HEIGHT`
+    ID_VIDEO_FPS=`fn_get_parameter "${inputfile}" ID_VIDEO_FPS`
+    ID_VIDEO_ASPECT=`fn_get_parameter "${inputfile}" ID_VIDEO_ASPECT`
+    ID_AUDIO_FORMAT=`fn_get_parameter "${inputfile}" ID_AUDIO_FORMAT`
+    ID_AUDIO_BITRATE=`fn_get_parameter "${inputfile}" ID_AUDIO_BITRATE`
+    ID_AUDIO_RATE=`fn_get_parameter "${inputfile}" ID_AUDIO_RATE`
+    ID_AUDIO_NCH=`fn_get_parameter "${inputfile}" ID_AUDIO_NCH`
+
+    (
+        cd "${dirmix}"; 
+        mencoder mf://*.jpg -mf fps=${ID_VIDEO_FPS}:type=jpg \
+            -ovc xvid -xvidencopts fixed_quant=3 -o "../${base}.mix.avi" \
+            -oac mp3lame -af lavcresample=${ID_AUDIO_RATE} \
+            -lameopts cbr:br=128 -srate ${ID_AUDIO_RATE} -mc 2 \
+            -audiofile "../${audio}"
+    )
+
+    # wipe up:
+    rm -rf "${diroriginal}" "${dirstable}" "${dirmix}" "${transform}" "${dummy}"
+fi
+

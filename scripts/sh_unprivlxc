@@ -1,0 +1,65 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  Container Starter and Finisher                                              #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+thisfile=`basename "$0"`
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    ${thisfile} <name_container>"
+    echo
+}
+
+# check for necessary apps:
+list_apps=( lxc-ls lxc-unpriv-start lxc-attach dialog )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+# inputs:
+[[ `echo "$1"`X == "X" ]] && { echo "No container selected. Aborting..."; fn_usage; exit -1; }
+
+# check whether input is an actuall container:
+[[ `lxc-ls -1 | grep -c "$1"` -gt 0 ]] || { echo "Container '$1' does not exist. Aborting..."; fn_usage; exit -1; }
+
+# start the container:
+lxc-unpriv-start -n "$1"
+sleep 10s
+
+while [ true ]; do
+    optmenu=$( dialog --title "'$1'" --erase-on-exit --nocancel --menu "Your choice now:" 0 0 0 \
+        "1" "nothing"  \
+        "2" "shutdown" \
+        "3" "attach"   \
+        2>&1 > /dev/tty )
+
+    [[ $? -ne "0" ]] && { echo "Aborted! No effect!"; }
+
+    case "${optmenu}" in
+        1)
+            ;;
+        2)
+            # stop the container:
+            lxc-attach --clear-env -n "$1" -- shutdown -hP now
+            break
+            ;;
+        3)
+            lxc-attach --clear-env -n "$1"
+            ;;
+    esac
+done
+

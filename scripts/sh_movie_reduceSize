@@ -1,0 +1,125 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script resizes a movie (with ffmpeg) to a target file size.            #
+#               Solution based on this post: https://unix.stackexchange.com/quest \         #
+#                     ions/520597/how-to-reduce-the-size-of-a-video-to-a-target-size        #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+thisfile=`basename "$0"`
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    ${thisfile} [options] <input_movie> <target_size_MB>"
+    echo
+    echo " Arguments:"
+    echo "   -h          this help information"
+    echo "   -o name     output file name"
+    echo
+}
+
+# check for necessary apps:
+list_apps=( ffmpeg ffprobe )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK"
+inputfilename=${defans}
+outputfilename=${defans}
+target_size_mb=${defans}
+
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "ho:" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            o)
+                outputfilename="${OPTARG}"
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        if [ "${inputfilename}" == ${defans} ]; then
+            # handle input filename:
+            [[ ! -e "${!OPTIND}" ]] && { echo "File '${!OPTIND}' not found. Aborting ..."; exit -1; }
+            inputfilename="${!OPTIND}"
+        else
+            # handle target size:
+            target_size_mb="${!OPTIND}"
+        fi
+        ((OPTIND++))
+    fi
+done
+
+# when the inputfilename was not provided:
+if [ "${inputfilename}" == ${defans} ]; then
+    echo "ERROR: No input file provided."
+    fn_usage
+    exit -1
+fi
+
+# when the target size was not provided:
+if [ "${target_size_mb}" == ${defans} ]; then
+    echo "ERROR: No target file size provided."
+    fn_usage
+    exit -1
+fi
+
+# when the output file name was not provided:
+if [ "${outputfilename}" == ${defans} ]; then
+    outputfilename="`echo ${inputfilename} | sed \"s/\.[[:alnum:]]\{,3\}$/-red${target_size_mb}MB&/\"`"
+fi
+
+target_size=$(( $target_size_mb * 1000 * 1000 * 8 )) # target size in bits; ffmpeg uses 1000 instead of 1024.
+length=`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputfilename}"`
+length_round_up=$(( ${length%.*} + 1 ))
+total_bitrate=$(( $target_size / $length_round_up ))
+audio_bitrate=$(( 128 * 1000 )) # 128k bit rate
+video_bitrate=$(( $total_bitrate - $audio_bitrate ))
+
+echo -e "\e[30;1;1;47minput_file_name   = ${inputfilename}\e[0m"
+echo -e "\e[30;1;1;47moutput_file_name  = ${outputfilename}\e[0m"
+echo -e "\e[30;1;1;47mtarget_size_bits  = ${target_size}\e[0m"
+echo -e "\e[30;1;1;47mlength            = ${length}\e[0m"
+echo -e "\e[30;1;1;47mlength_round_up   = ${length_round_up}\e[0m"
+echo -e "\e[30;1;1;47mtotal_bitrate     = ${total_bitrate}\e[0m"
+echo -e "\e[30;1;1;47maudio_bitrate     = ${audio_bitrate}\e[0m"
+echo -e "\e[30;1;1;47mvideo_bitrate     = ${video_bitrate}\e[0m"
+
+# original:
+ffmpeg -i "${inputfilename}" -b:v $video_bitrate -maxrate:v $video_bitrate -bufsize:v $(( $target_size / 20 )) -b:a $audio_bitrate "${outputfilename}"
+
+# error: "Too many packets buffered for output stream 0:1."
+[[ -e "${outputfilename}" ]] && [[ `stat --format="%s" "${outputfilename}"` == 0 ]] && { \
+    ffmpeg -i "${inputfilename}"  -y      \
+    -max_muxing_queue_size 12000    \
+    -b:v $video_bitrate -maxrate:v $video_bitrate -bufsize:v $(( $target_size / 20 )) -b:a $audio_bitrate "${outputfilename}" \
+; }
+

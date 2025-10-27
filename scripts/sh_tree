@@ -1,0 +1,113 @@
+#!/bin/bash
+
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  List the tree of directories with the respective size given by 'du'.        #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    `basename $0` [-Dn] [-H] [root-tree]"
+    echo
+    echo -e "\t -Dn \t where 'n' is the max depth to search for."
+    echo -e "\t -H  \t to show also hidden directories."
+    exit -1
+}
+
+# check for necessary apps:
+list_apps=( ffmpeg dialog python3 )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+# collecting all arguments:
+roottree="."
+maxdepth=-1
+showhidden=0
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hHD:" opt; then
+        case $opt in
+            D)
+                maxdepth="$OPTARG"
+                #echo "-D triggered with ${maxdepth}"
+                ;;
+            H)
+                showhidden=1
+                ;;
+            h)
+                fn_usage
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                fn_usage
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                fn_usage
+                ;;
+        esac
+    else
+        #echo "argument without a flag: '${!OPTIND}'"
+        [[ -e "${!OPTIND}" ]] || { echo "Given root-tree '${!OPTIND}' could not be found. Aborting..."; fn_usage; }
+        roottree="${!OPTIND}"
+        ((OPTIND++))
+    fi
+done
+
+if false; then
+    echo "summary:"
+    echo "  maxdepth = ${maxdepth}"
+    echo "  roottree = ${roottree}"
+fi
+
+# scan one level
+#  fn_scanonelevel "root" "currentdepth" "string"
+fn_scanonelevel ()
+{
+    if false; then
+        echo "------------------------------------------"
+        echo "root         = $1"
+        echo "maxdepth     = ${maxdepth}"
+        echo "currentdepth = $2"
+        echo "string       = $3"
+    fi
+
+    size=`du -sh "$1" 2> /dev/null | sed 's/[[:blank:]]\+.*$//'`
+    if [ `echo "${size}" | grep -oic "k"` -gt 0 ]; then
+        size=`python3 -c "print('[\\e[1;32m{:>7s}\\e[0m]'.format(\"${size}\"))"`
+    elif [ `echo "${size}" | grep -oic "m"` -gt 0 ]; then
+        size=`python3 -c "print('[\\e[1;33m{:>7s}\\e[0m]'.format(\"${size}\"))"`
+    elif [ `echo "${size}" | grep -oic "g"` -gt 0 ]; then
+        size=`python3 -c "print('[\\e[1;31m{:>7s}\\e[0m]'.format(\"${size}\"))"`
+    elif [ `echo "${size}" | grep -oic "t"` -gt 0 ]; then
+        size=`python3 -c "print('[\\e[1;36m{:>7s}\\e[0m]'.format(\"${size}\"))"`
+    else
+        size=`python3 -c "print('[{:>7s}]'.format(\"${size}\"))"`
+    fi
+
+    echo -e "$3${size}  `basename \"$1\"`"
+
+    if [ ${maxdepth} -lt 0 ] || [ ${maxdepth} -ge 0 -a $2 -lt ${maxdepth} ]; then
+        find "$1" -mindepth 1 -maxdepth 1 -type d | sort | while read nome; do
+            basename=`basename "${nome}"`
+            if ! [ `echo "${basename}" | grep -c "^\."` -gt 0 -a ${showhidden} == 0 ]; then
+                fn_scanonelevel "${nome}" $(( $2 + 1 )) "$3   "
+            fi
+        done
+    fi
+}
+
+## listing directories:
+fn_scanonelevel "${roottree}" 0 ""

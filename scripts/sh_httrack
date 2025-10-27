@@ -1,0 +1,129 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  Private settings for HTTRACK                                                #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+thisfile=`basename "$0"`
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    ${thisfile} [options]"
+    echo
+    echo " Arguments:"
+    echo "   -h        this help information"
+    echo "   -u        url to mirror"
+    echo "   -l        list file to mirror"
+    echo "   -rN       mirror depth (*r1)"
+    echo "   -o        target folder; default=httrack.XXrandom"
+    echo
+}
+
+# check for necessary apps:
+list_apps=( httrack )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK"
+url=${defans}
+listfile=${defans}
+destfolder=${defans}
+mirrordepth=1
+
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hu:l:o:r:" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            o)
+                destfolder=${OPTARG}
+                ;;
+            u)
+                [[ ${listfile} == ${defans} ]] || { echo "Url cannot be set as a list to mirror is already available. Aborting ..."; exit -1; }
+                url="${OPTARG}"
+                ;;
+            l)
+                [[ ${url} == ${defans} ]] || { echo "Listfile cannot be set as an URL is already available. Aborting ..."; exit -1; }
+                listfile="${OPTARG}"
+                ;;
+            r)
+                mirrordepth=${OPTARG}
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        ((OPTIND++))
+    fi
+done
+
+[[ ${url} == ${defans} && ${listfile} == ${defans} ]] && { echo "Nothing to do. Aborting ..."; exit 0; }
+[[ ${destfolder} == ${defans} ]] && destfolder=httrack.`sh_uniqfile . | sed 's/[^[:alnum:]]/X/g'`
+
+if true; then
+    echo "url           = ${url}"
+    echo "list-file     = ${listfile}"
+    echo "mirrordepth   = ${mirrordepth}"
+    echo "output folder = ${destfolder}"
+fi
+sleep 4s
+
+# In case of customizations, one can delete everything above this line and set these variables
+# at once:
+#  defans="NOK"
+#  url="https://randomnerdtutorials.com/projects-esp32/"
+#  mirrordepth=2
+#  destfolder=.
+#  filters="-* +*esp32* +*.jpg* +*.png* +*.gif* +*.jpeg* +*.css*"
+#  filters="-* +*dac-audio* +*.jpg* +*.png* +*.gif* +*.jpeg* +*.css* +*.svg*"
+#  filters="-* +*dac-audio* +mime:image/* +*.css*"
+filters="+*"
+
+#url="https://www.upesy.com/blogs/tutorials/list-tutorials-for-esp32-on-arduino-code-and-micropython"
+keys="-%i -w -n -x -b1 -v -I -N0 -%v2 -p7 -s2 -r${mirrordepth} -%e0 -C0 -%P -%s -%u -K0 -c8 -%k --can-go-up-and-down --stay-on-same-domain" 
+keys="${keys} -z -f2 -#f -#T -O ${destfolder}"
+
+#--userdef-cmd "sed -i 's.srcset=\"[^\"]*\"..g' \$0"                       <-- only works when 1st" and 2nd" are in the same line.
+#--userdef-cmd "sed -z 's.srcset=\"\\([^\"]*\\n\\)*[^\"]*\"..g' -i \$0"    <-- multiple lines
+
+if [ "${url}" != ${defans} ]; then
+    httrack $keys \
+        -F "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0" -%F "" \
+        --userdef-cmd "sed -z 's.srcset=\"\\([^\"]*\\n\\)*[^\"]*\"..g' -i \"\$0\"" \
+        ${url} ${filters}
+else
+    httrack $keys \
+        -F "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0" -%F "" \
+        --userdef-cmd "sed -z 's.srcset=\"\\([^\"]*\\n\\)*[^\"]*\"..g' -i \"\$0\"" \
+        --list "${listfile}" ${filters}
+fi
+
+echo
+echo "destfolder = ${destfolder}"
+echo

@@ -1,0 +1,150 @@
+#!/bin/bash
+
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script normalizes the audio of some video files.                       #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    $0 [options] <input_file>"
+    echo
+    echo " Arguments:"
+    echo "   -h       prints this help information."
+    echo "   -c       copies (not only skips) files (hardlink) where normalization is not necessary."
+    echo "   -o name  sets output filename."
+    echo
+}
+
+switch_c=0
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hco:" opt; then
+        case $opt in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            c)
+                switch_c=1
+                ;;
+            o)
+                outname="${OPTARG}"
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        [[ ! -e "${!OPTIND}" ]] && { echo "File '${!OPTIND}' not found. Aborting ..."; exit -1; }
+        inputfile="${!OPTIND}"
+        ((OPTIND++))
+    fi
+done
+
+# any input file?
+[[ "${inputfile}X" == X ]] && { echo "No input file provided! Aborting..."; fn_usage; exit -1 ; }
+
+list_compatible_movies=( avi mp4 )
+for i in ${list_compatible_movies[@]}; do
+    is_type=`file "${inputfile}" | grep -ic ":.*${i}.*$"`
+
+    #echo "file     = ${inputfile}"
+    #echo "is type == ${i}"
+
+    if [ ${is_type} -ge 1 ]; then
+        type=${i}
+        #echo "type     = $type"
+        break
+    fi
+done
+
+#[[ "${type}"X == "X" ]] && { echo "file type not recognized... aborting!"; exit -1; } || echo "file '${inputfile}' = ${type}"
+[[ "${type}"X == "X" ]] && type="NONE"
+
+# check for necessary apps:
+list_apps=( ffmpeg python3 id3v2 )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+# Find out the gain to apply
+# First you need to analyze the audio stream for the maximum volume to see if normalizing would even pay off:
+# The -vn, -sn, and -dn arguments instruct ffmpeg to ignore non-audio streams during this analysis. This drastically speeds up the analysis.
+
+max_volume_dB=`ffmpeg -i "${inputfile}" -af "volumedetect" -vn -sn -dn -f null /dev/null 2>&1 | grep "max_volume" | sed 's/^.*:[[:blank:]]*\([-0-9.]\+\).*$/\1/'`
+echo ""
+echo "max_volume = ${max_volume_dB} [dB]"
+
+normalize=1
+[[ `python3 -c "if abs(${max_volume_dB}) < 0.1: print('zero')" | grep -c "zero"` -ge 1 ]] && normalize=0
+volume_to_apply=`python3 -c "print('{:1.1f}'.format(-${max_volume_dB}))"`
+echo "volume_to_apply = ${volume_to_apply} [dB]"
+
+# create output filename:
+if [ "${outname}"X == X ]; then
+    if [ `echo "${inputfile}" | grep -c "\.[[:alnum:]]\+$"` -ge 1 ]; then
+        outname=`echo "${inputfile}" | sed 's/\.[[:alnum:]]\+$/-normalized&/'`
+    else
+        outname=`echo "${inputfile}" | sed 's/$/-normalized/'`
+    fi
+    outname=`basename "${outname}"`
+fi
+echo "output filename = ${outname}"
+
+if [ ${normalize} == 0 ]; then
+    if [ ${switch_c} == 1 ]; then
+        echo "nothing to do here... copying (hardlink) original file!"
+        cp -l ${inputfile} ${outname}
+    else
+        echo "nothing to do here... aborting!"
+    fi
+    exit 0
+fi
+
+# AVI format: Usually there's MP3 audio with video that comes in an AVI container:
+# 
+# ffmpeg -i video.avi -af "volume=5dB" -c:v copy -c:a libmp3lame -q:a 2 output.avi
+# 
+# Here we chose quality level 2. Values range from 0–9 and lower means better.
+# Check the MP3 VBR guide for more info on setting the quality. You can also
+# set a fixed bitrate with -b:a 192k, for example.
+
+if [ ${type} == "avi" ]; then
+    ffmpeg -i "${inputfile}" -af "volume=${volume_to_apply}dB" -c:v copy -c:a libmp3lame -b:a 2 "${outname}"
+fi
+
+
+# MP4 format: With an MP4 container, you will typically find AAC audio. We can
+# use ffmpeg's build-in AAC encoder.
+# 
+# ffmpeg -i video.mp4 -af "volume=5dB" -c:v copy -c:a aac -b:a 192k output.mp4
+# 
+# Here you can also use other AAC encoders. Some of them support VBR, too. See
+# this answer and the AAC encoding guide for some tips.
+
+if [ ${type} == "mp4" ]; then
+    ffmpeg -i "${inputfile}" -af "volume=${volume_to_apply}dB" -c:v copy -c:a aac -b:a 192k "${outname}"
+fi
+
+if [ ${type} == "NONE" ]; then
+    ffmpeg -i "${inputfile}" -af "volume=${volume_to_apply}dB" -c:v copy "${outname}"
+fi

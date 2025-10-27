@@ -1,0 +1,191 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script finds files in one directory which are present or absent in     #
+#               another directory.                                                          #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+fn_get_abs_filename() {
+    # $1 : relative filename
+    filename="$1"
+    parentdir=`dirname "${filename}"`
+
+    if [ -d "${filename}" ]; then
+        echo "$(cd "${filename}" && pwd)"
+    elif [ -d "${parentdir}" ]; then
+        echo "$(cd "${parentdir}" && pwd)/$(basename "${filename}")"
+    fi
+}
+
+fn_usage() {
+    name=`basename "$0"`
+    echo
+    echo "Usage:"
+    echo "   $name  [options] DIRSOURCE DIR1 [DIR2 ...]"
+    echo "   $name  [options] DIRSOURCE"
+    echo
+    echo "Description:"
+    echo "   Checks whether each file in DIRSOURCE is present/absent within any DIRn."
+    echo "   Links are currently not followed."
+    echo "   In case a output file of 'fdupes -r DIRSOURCE DIR1 ...' is available, the second"
+    echo "   variant might bu used, with -f switch."
+    echo
+    echo "Arguments:"
+    echo "   -a [default]"
+    echo "        Shows the files in DIRSOURCE not present in DIRn."
+    echo
+    echo "   -p"
+    echo "        Shows the files in DIRSOURCE present in DIRn."
+    echo
+    echo "   -f fdupes_file"
+    echo "        Sets the fdupes file to have used, when available."
+    echo
+    echo "   -H"
+    echo "        Hardlinked files are treated as separated files."
+    echo
+
+    exit -1
+}
+
+# arguments:
+opt_a=0
+opt_p=0
+opt_f=0
+opt_H=0
+dirsrc=0
+thisdir=
+fdupesfile=
+listdirs=()
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts ":apf:H" opt; then
+        case $opt in
+            a)
+                #echo "-a triggered."
+                opt_a=1
+                ;;
+            p)
+                #echo "-p triggered."
+                opt_p=1
+                ;;
+            f)
+                #echo "-f triggered with '${OPTARG}'."
+                opt_f=1
+                fdupesfile="${OPTARG}"
+                ;;
+            H)
+                #echo "-H triggered."
+                opt_H=1
+                ;;
+            :)
+                echo "Missing parameter."
+                fn_usage
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                ;;
+        esac
+    else
+
+        if [ ${dirsrc} -eq 0 ]; then
+            dirsource="${!OPTIND}"
+            #echo "DIRSOURCE = '${dirsource}'"
+            ((dirsrc++))
+            [[ -d "${dirsource}" ]] || { echo "Directory '${dirsource}' does not exist. Aborting..."; fn_usage ; }
+
+        else
+            thisdir="${!OPTIND}"
+            #echo "thisdir = '${thisdir}'"
+            [[ -d "${thisdir}" ]] || { echo "Directory '${thisdir}' does not exist. Aborting..."; fn_usage ; }
+            escaping1=$(printf '%q' "${thisdir}")
+            escaping2=$(echo ${thisdir@Q})
+            listdirs+=( ${thisdir} )
+        fi
+
+        ((OPTIND++))
+    fi
+done
+
+# checks:
+if [ ${opt_a} -eq 0 -a ${opt_p} -eq 0 ]; then
+    Do="absent" # default
+elif [ ${opt_a} -eq 0 -a ${opt_p} -eq 1 ]; then
+    Do="present"
+elif [ ${opt_a} -eq 1 -a ${opt_p} -eq 0 ]; then
+    Do="absent"
+else
+    echo "Options -a and -p cannot be selected simultaneously."
+    fn_usage
+fi
+
+if [ ${opt_f} -eq 1 -a "${thisdir}X" != "X" ]; then
+    echo "Switch -f is active. Aborting..."
+    fn_usage
+fi
+
+if [ ! -e "${fdupesfile}" -a ${opt_f} -eq 1 ]; then
+    echo "File '${fdupesfile}' does not exist. Aborting..."
+    fn_usage
+fi
+
+[[ ${dirsrc} -ge 1 ]] || { echo "Source folder '${dirsource}' not found. Aborting..."; fn_usage ; }
+
+#echo "selection = '${Do}'"
+echo "dirsource = '${dirsource}'"
+echo "listdirs  = '${listdirs[@]}'"
+
+# Do == absent: it shows files in ${dirsource} NOT present in ANY of the selected folders.
+if [ "${Do}" == "absent" ]; then
+    echo "--> List of files present in '${dirsource}', but absent in ANY of the other directories:"
+
+    # GREP:
+    # -x, --line-regexp
+    #     Select  only  those  matches  that  exactly  match  the  whole  line.   For a
+    #     regular expression pattern, this is like parenthesizing the pattern and then
+    #     surrounding it with ^ and $.
+    # 
+    # -F, --fixed-strings
+    #     Interpret PATTERNS as fixed strings, not regular expressions.
+    # 
+    # -f FILE, --file=FILE
+    #     Obtain patterns from FILE, one per line.  If this option is used multiple times
+    #     or is combined with the -e  (--regexp) option, search for all patterns given.
+    #     The empty file contains zero patterns, and therefore matches nothing.
+
+    if [ "${fdupesfile}X" == "X" ]; then
+        if [ "${opt_H}" -eq 0 ]; then
+            find "${dirsource}" -type f | grep -vxFf <(fdupes -r "${dirsource}" ${listdirs[@]})
+        else
+            find "${dirsource}" -type f | grep -vxFf <(fdupes -rH "${dirsource}" ${listdirs[@]})
+        fi
+    else
+        find "${dirsource}" -type f | grep -vxFf "${fdupesfile}"
+    fi
+
+# Do == present: it shows files in ${dirsource} AND also in ANY of the selected folders.
+else
+    echo "--> List of files present in '${dirsource}' AND in any of the other(s):"
+
+    if [ "${fdupesfile}X" == "X" ]; then
+        if [ "${opt_H}" -eq 0 ]; then
+            find "${dirsource}" -type f | grep -xFf <(fdupes -r "${dirsource}" ${listdirs[@]})
+        else
+            find "${dirsource}" -type f | grep -xFf <(fdupes -rH "${dirsource}" ${listdirs[@]})
+        fi
+    else
+        find "${dirsource}" -type f | grep -xFf "${fdupesfile}"
+    fi
+fi
+
+# remove temp files:
+
