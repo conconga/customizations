@@ -27,7 +27,7 @@
 # select particular combination of files and folders.
 #
 # Usage:
-#    cat <file> | sed -n '1p;/rules/p' | sh_fdupes_showblock
+#    cat <file> | sed -n '1p;/rules/p' | sh_fdupes_one2Mlines
 #
 # where:
 #   file  :   file generated with 'sh_fdupes_Mlines2one'

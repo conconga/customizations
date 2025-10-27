@@ -1,0 +1,49 @@
+#!/bin/bash
+#############################################################################################
+###########                                                                       ###########
+######                                                                                 ######
+##                                                                                         ##
+# \author       Luciano Augusto Kruk                                                        #
+# \web          www.kruk.eng.br                                                             #
+#                                                                                           #
+# \description  This script finds lost/forgotten git repositories.                          #
+#                                                                                           #
+# \copyright    Please keep this head when you distribute this script.                      #
+##                                                                                         ##
+######                                                                                 ######
+###########                                                                       ###########
+#############################################################################################
+
+thisfile=`basename "$0"`
+
+fn_usage()
+{
+    echo
+    echo "USAGE:"
+    echo "    ${thisfile} [initial_path]"
+    echo
+    exit -1
+}
+
+# check for necessary apps:
+list_apps=( )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+# check for input initial directory:
+if [ $# -ge 1 ]; then
+    [[ -d "$1" ]] || { echo "Path '$1' not found. Aborting ..."; fn_usage; }
+    thispath="$1"
+else
+    thispath="."
+fi
+#echo "selected path = '${thispath}'"
+
+find "${thispath}" -type d | grep "\.git$" | while read nome; do
+    if [ `basename "${nome}"` == ".git" ]; then
+        pasta=`echo "${nome}" | sed 's/^\(.*\)\/.*$/\1/'`
+        len=`du -sh "${pasta}" | sed 's/^\([[:graph:]]\{,10\}\).*$/\1/'`
+        echo "${len} ${pasta}"
+    fi
+done | column -t
