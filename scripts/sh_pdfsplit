@@ -29,7 +29,7 @@ if test ! -e "$1"; then
 fi
 
 # numero de paginas do PDF:
-pag=`pdfinfo "$1" | grep "^Pages"`
+pag=`pdfinfo "$1" | strings | grep "^Pages"`
 if test $? != 0; then
 	echo "Could NOT read source file."
 	exit -1
