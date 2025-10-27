@@ -3,31 +3,31 @@
 **etc_default_locale**...........regional settings;</br>
 **bash_profile**.................customizations for bash usage;</br>
 **sh_IM_shadow**.................removes strong shadows from scanned images;</br>
-**sh_fdupes_compareFolders**.....nice to find the content of a folder within another
+**sh_fdupes_compareFolders**.....nice to find the content of a folder within another;</br>
 **sh_fdupes_Mlines2one**.........compresses fdupes output into one line;</br>
 **sh_fdupes_one2Mlines**.........expands the compressed fdupes outputs into multiple lines;</br>
-**sh_git_findLostRepo**..........searches for .git folders in the structure
+**sh_git_findLostRepo**..........searches for .git folders in the structure;</br>
 **sh_git_largestobj**............find the largest files in a repository;</br>
 **sh_git_listuntrackednodir**....show only untracked files in a repository;</br>
 **sh_gitshrink**.................remove some files from a repository;</br>
 **sh_gpg2file**..................decrypt several gpg files with input of password only once;</br>
-**sh_httrack**...................shortcut to httrack with the most useful switches
+**sh_httrack**...................shortcut to httrack with the most useful switches;</br>
 **sh_iso2utf**...................convert ISO8859-1 encoded file to UTF-8;</br>
 **sh_jpg2pdfA4**.................convert a JPG file into a PDF with A4 page size;</br>
 **sh_jpg2pdfA4graybrd**..........converts a JPG file to A4 grayscaled picture with white border;</br>
 **sh_jpgs_to_pdf_fast**..........a single script to convert several jpg files to a pdf with fixed settings;</br>
 **sh_lsemptydirs**...............lists recursively all empty dirs in a tree;</br>
-**sh_movie_normalizeAudio**......normalizes the audio level within a movie
-**sh_movie_reduceSize**..........tries to match the filesize of a movie to a given value
-**sh_movie_vidstab**.............creates a video-stabilized movie
+**sh_movie_normalizeAudio**......normalizes the audio level within a movie;</br>
+**sh_movie_reduceSize**..........tries to match the filesize of a movie to a given value;</br>
+**sh_movie_vidstab**.............creates a video-stabilized movie;</br>
 **sh_pdf2jpg**...................converts single page PDF in JPG picture;</br>
 **sh_pdf2png**...................converts multiple pages PDF in PNG pictures (LATEX equations);</br>
 **sh_pdfcat**....................concatenates multiple PDF files;</br>
 **sh_pdfcrop**...................crop white margin around a single page PDF file;</br>
 **sh_pdfsplit**..................extracts each page of a PDF in a single file;</br>
 **sh_svg2pdf**...................converts a list of SVG file into PDF files;</br>
-**sh_tree**......................similar to 'tree', but better (although slower)
+**sh_tree**......................similar to 'tree', but better (although slower);</br>
 **sh_uniqfile**..................creates a unique filename for a given path;</br>
-**sh_unprivlxc**.................handles start of unprivileged LXC containers
+**sh_unprivlxc**.................handles start of unprivileged LXC containers;</br>
 **sh_utf2iso**...................converts a UTF-8 encoded file into a ISO8859-1 file;</br>
 **uncrustify_e.cfg**.............my personal current uncrustify configuration;</br>
