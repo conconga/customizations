@@ -14,47 +14,119 @@
 ###########                                                                       ###########
 #############################################################################################
 
-if [ $# -eq 0 ]; then
-    echo
-    echo "Usage:"
-    echo "   `basename $0` <out.pdf> <jpg_1> [ [jpg_2] ... ]"
-    echo
-    exit -1;
-fi
+fn_usage()
+{
+    if [ $# -eq 0 ]; then
+        echo
+        echo "Usage:"
+        echo "   `basename $0` [-c] <out.pdf> <jpg_1> [ [jpg_2] ... ]"
+        echo
+        echo " Arguments:"
+        echo "   -h        this help information"
+        echo "   -c        shadowing with colors"
+        exit -1;
+    fi
+}
 
-apps=( 'sh_uniqfile' 'sh_IM_shadow' 'sh_pdfcat' )
+apps=( 'sh_uniqfile' 'sh_IM_shadow' 'sh_pdfcat' 'dialog' )
 for app in ${apps[@]};
 do
     [ "`which ${app}`x" = "x" ] && { echo "ERR: application '${app}' not found. Aborting..."; exit -1; }
 done
 
-outfile="$1"
-shift
+list_shadow="`sh_uniqfile -f /tmp`"
+list_pdf="`sh_uniqfile -f /tmp`"
+list_inputs="`sh_uniqfile -f /tmp`"
 
-list_shadow="`sh_uniqfile .`"
-touch ${list_shadow}
-list_pdf="`sh_uniqfile .`"
-touch ${list_pdf}
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK_485734985734985734059783049583049583409538"
+colors=${defans}
+outfile=${defans}
 
-while [ $# -gt 0 ]; do
-    [ ! -e "$1" ] && { echo "file '$1' not found. Aborting..."; exit -1; }
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hc" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            c)
+                colors=1
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        # the outfile was alread selected?
+        if [ "${outfile}" == ${defans} ]; then
+            outfile="${!OPTIND}"
+        else
+            [[ ! -e "${!OPTIND}" ]] && \
+                { echo "File '${!OPTIND}' not found. Skipping ... "; } || \
+                { echo "${!OPTIND}" >> ${list_inputs} ; }
+        fi
+        ((OPTIND++))
+    fi
+done
+
+# any selected inputs?
+[[ `cat "${list_inputs}" | wc -l` == 0 ]] && { echo "No input files. Aborting ..."; fn_usage; exit -1; }
+
+# get density of images:
+dens=$( dialog --erase-on-exit --nocancel --inputbox "Set density of images [pixels per inch]." 0 0 "100" 2>&1 > /dev/tty )
+retval=$?
+[[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+
+# get quality of compressed images:
+qlty=$( dialog --erase-on-exit --nocancel --inputbox "Set quality of compressed images [%]." 0 0 "50" 2>&1 > /dev/tty )
+retval=$?
+[[ ${retval} -ne "0" ]] && { echo "Aborted!"; exit -1; }
+
+# report:
+if [[ 0 == 0 ]]; then
+    echo "---------------------------------"
+    echo "colored     = ${colors}"
+    echo "outfile     = ${outfile}"
+    echo "density     = ${dens}"
+    echo "quality     = ${qlty}"
+    echo "list_shadow = ${list_shadow}"
+    echo "list_pdf    = ${list_pdf}"
+    echo "list_inputs = ${list_inputs}"
+    echo "---------------------------------"
+fi
+
+cat "${list_inputs}" | while read inputfile; do
+    [ ! -e "${inputfile}" ] && { echo "file '${inputfile}' not found. Aborting..."; exit -1; }
 
     tmpshadow="`sh_uniqfile .`"
     tmppdf="${tmpshadow}.pdf"
 
     # shadow:
-    echo ". shadowing '$1'..."
-    sh_IM_shadow "$1" "${tmpshadow}"
+    echo ". shadowing '${inputfile}'..."
+    #sh_IM_shadow "${inputfile}" "${tmpshadow}"
+    if [ "${colors}" == 1 ]; then
+        convert "${inputfile}" \( -clone 0 -blur 0x100 \) +swap -compose divide -composite "${tmpshadow}"
+    else
+        convert "${inputfile}" \( -clone 0 -colorspace Gray -blur 0x100 \) +swap -compose divide -composite "${tmpshadow}"
+    fi
     echo "${tmpshadow}" >> ${list_shadow}
 
     # jpg to pdf:
     unit=PixelsPerInch
-    dens=100
-    #dens=200
     pagesize=$((dens*827/100))x$((dens*1169/100))
 
-    echo ". creating pdf from '$1'..."
-    convert "${tmpshadow}" -compress jpeg -quality 100                \
+    echo ". creating pdf from '${inputfile}'..."
+    convert "${tmpshadow}" -compress jpeg -quality ${qlty}  \
         -resize $pagesize -gravity center -extent $pagesize \
         -repage $pagesize -units $unit -density ${dens}x${dens} "${tmppdf}"
     echo "${tmppdf}" >> ${list_pdf}
@@ -72,6 +144,6 @@ fi
 # cleaning:
 cat "${list_shadow}" | xargs rm -fv
 cat "${list_pdf}"    | xargs rm -fv
-rm -fv "${list_shadow}" "${list_pdf}"
+rm -fv "${list_shadow}" "${list_pdf}" "${list_inputs}"
 
 #############################################################################################
