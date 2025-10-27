@@ -151,6 +151,9 @@ set listchars=tab:\|\ ,trail:.,extends:>,precedes:<,eol:$
 " 100 cols wide
 " set columns=100
 
+" set textwidth with autobreak:
+"set tw=100
+
 " Minimal number of screen lines to keep above and below the cursor
 set scrolloff=5
 
@@ -390,6 +393,10 @@ map \D :Dict
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " highlight a line with ##### marks
 let @t = ":s/[[:blank:]]*$//I-- ^vlr#A ##O500A jhlkv0r#j^kv0r ^hr#ElDyyjp"
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" highlight a line with << >>
+let @y = ":s/[[:blank:]]*$//\"7diwkI<< @7A 0@7 DA>>O<<@7A-0@7 C>>Yjpjdd"
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Scrolling, nicer scrolling when wrapping
