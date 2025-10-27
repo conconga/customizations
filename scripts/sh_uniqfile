@@ -15,12 +15,64 @@
 #############################################################################################
 
 # usage:
-[ $# = 1 ] || { echo "Usage:"; echo "  sh_uniqfile <PATH>"; exit -1; }
+fn_usage()
+{
+    echo "Usage:"
+    echo -e "\t `basename $0` [-d] [-f] <PATH>"
+    echo -e "\t -d \t creates an empty directory with the selected name"
+    echo -e "\t -f \t creates an empty file (touch) with the selected name"
+    exit -1
+}
+
+# check for necessary apps:
+list_apps=( touch )
+for i in ${list_apps[@]}; do
+    [[ `which ${i}`X == X ]] && { echo "'${i}' not found! Aborting..."; exit -1; }
+done
+
+# parsing arguments:
+where=
+flag_d=0
+flag_f=0
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hdf" opt; then
+        case $opt in
+            d)
+                flag_d=1
+                ;;
+            f)
+                flag_f=1
+                ;;
+            h)
+                fn_usage
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                fn_usage
+                ;;
+        esac
+    else
+        #echo "argument without a flag: '${!OPTIND}'"
+        [[ "X${where}X" == "XX" ]] || { echo "Unknown argument: '${!OPTIND}'. Aborting ..."; fn_usage; }
+        [[ -e "${!OPTIND}" ]] || { echo "The given path '${!OPTIND}' does not exist. Aborting ..."; exit -1; }
+        where=`echo "${!OPTIND}" | sed 's./*[[:blank:]]*$..'`
+        ((OPTIND++))
+    fi
+done
+
+[[ ${where}X == "X" ]] && { echo "A path was not provided. Aborting ..."; echo; fn_usage; }
+[[ "${flag_d}${flag_f}X" == "11X" ]] && { echo "The switches -f and -d cannot be called simultaneously. Aborting ..."; exit -1; }
 
 while [ true ]; do
     file=`date +"%N" | md5sum | grep -o "^[[:graph:]]\+"`
-    [ ! -e "$1/$file" ] && break;
+    output="${where}/${file}"
+    [ ! -e "${output}" ] && break;
 done
 
-echo "$1/$file"
-#############################################################################################
+# create directory:
+[[ ${flag_d} == 1 ]] && { mkdir "${output}"; }
+
+# create file:
+[[ ${flag_f} == 1 ]] && { touch "${output}"; }
+
+echo "${output}"
