@@ -14,20 +14,78 @@
 ###########                                                                       ###########
 #############################################################################################
 
-if [ $# -ne 1 -a $# -ne 2 ]; then
+fn_usage() {
     echo
     echo "USAGE:"
-    echo "    sh_IM_shadow <input_image> [output_image]"
+    echo "    `basename $0` [-c] <input_image> [output_image]"
     echo
-    exit -1
+    echo " Arguments:"
+    echo "   -h        this help information"
+    echo "   -c        shadowing with colors"
+    echo
+}
+
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK_485734985734985734059783049583049583409538"
+colors=${defans}
+inputfile=${defans}
+outfile=${defans}
+
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hc" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            c)
+                colors=1
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        # the inputfile was alread selected?
+        if [ "${inputfile}" == ${defans} ]; then
+            inputfile="${!OPTIND}"
+            [[ ! -e "${inputfile}" ]] && { echo "Input file '${inputfile}' not found. Aborting ..."; exit -1; }
+        else
+            outfile="${!OPTIND}"
+        fi
+        ((OPTIND++))
+    fi
+done
+
+# any input file?
+[[ "${inputfile}" == ${defans} ]] && { echo "Incorrent number of input arguments. Aborting ..."; fn_usage; exit -1; }
+
+# any selected output?
+if [ "${outfile}" == "${defans}" ]; then
+    if [ `echo "${inputfile}" | grep -c "\.[[:alnum:]]\{1,3\}$"` -gt 0 ]; then
+        outfile="`echo \"${inputfile}\" | sed 's/\.[[:alnum:]]\{1,3\}$/-shadow&/'`"
+        echo "outfile = ${outfile}"
+    else
+        outfile="`echo \"${inputfile}\" | sed 's/$/-shadow.jpg/'`"
+        echo "outfile = ${outfile}"
+    fi
 fi
 
-if [ $# -eq 1 ]; then
-    new=`basename "$1"`
-    new=`echo "$new" | sed 's/\..\{1,4\}$/-shadow&/'`
+echo "[sh_IM_shadow] inputfile = ${inputfile}"
+echo "[sh_IM_shadow] outfile   = ${outfile}"
+
+if [ "${colors}" == 1 ]; then
+    convert "${inputfile}" \( -clone 0 -blur 0x100 \) +swap -compose divide -composite "${outfile}"
 else
-    new="$2"
+    convert "${inputfile}" \( -clone 0 -colorspace Gray -blur 0x100 \) +swap -compose divide -composite "${outfile}"
 fi
-
-convert "$1" \( -clone 0 -colorspace Gray -blur 0x100 \) +swap -compose divide -composite "$new"
 
