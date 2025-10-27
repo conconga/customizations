@@ -22,34 +22,102 @@ fn_usage() {
     echo
     echo "Usage:"
     echo
-    echo "   $name  <jpg-file>  [pdf-file]"
+    echo "   $name  [-s|-c] <jpg-file>  [pdf-file]"
     echo
-    exit -1
+    echo " Arguments:"
+    echo "   -s     enable shadowing of the source file"
+    echo "   -c     enable shadowing with colors of the source file"
+    echo
 }
 
-# verify #arguments:
-if [ $# -ne 1 -a $# -ne 2 ]; then
-    echo "invalid number of arguments!"
-    fn_usage
+apps=( 'sh_uniqfile' 'sh_IM_shadow' )
+for app in ${apps[@]};
+do
+    [ "`which ${app}`x" = "x" ] && { echo "ERR: application '${app}' not found. Aborting..."; exit -1; }
+done
+
+#######################
+## Argument Parsing: ##
+#######################
+defans="NOK_485734985734985734059783049583049583409538"
+shadow=${defans}
+colors=${defans}
+inputfile=${defans}
+outfile=${defans}
+
+while [ ${OPTIND} -le "$#" ]; do
+    if getopts "hsc" opt; then
+        case ${opt} in
+            h)
+                fn_usage
+                exit 0
+                ;;
+            c)
+                colors=1
+                ;;
+            s)
+                shadow=1
+                ;;
+            \?)
+                echo "Invalid option: -${OPTARG}" >&2
+                fn_usage
+                exit -1
+                ;;
+            :)
+                echo "Option -${OPTARG} requires an argument." >&2
+                fn_usage
+                exit -1
+                ;;
+        esac
+    else
+        # the inputfile was alread selected?
+        if [ "${inputfile}" == ${defans} ]; then
+            inputfile="${!OPTIND}"
+            [[ ! -e "${inputfile}" ]] && { echo "Input file '${inputfile}' not found. Aborting ..."; exit -1; }
+        else
+            outfile="${!OPTIND}"
+        fi
+        ((OPTIND++))
+    fi
+done
+
+# any input file?
+[[ "${inputfile}" == ${defans} ]] && { echo "Incorrent number of input arguments. Aborting ..."; fn_usage; exit -1; }
+
+# any selected output?
+if [ "${outfile}" == "${defans}" ]; then
+    if [ `echo "${inputfile}" | grep -c "\.[[:alnum:]]\{1,3\}$"` -gt 0 ]; then
+        outfile="`echo \"${inputfile}\" | sed 's/\.[[:alnum:]]\{1,3\}$/.pdf/'`"
+        echo "outfile = ${outfile}"
+    else
+        outfile="`echo \"${inputfile}\" | sed 's/$/.pdf/'`"
+        echo "outfile = ${outfile}"
+    fi
 fi
 
-# verify input file:
-[[ ! -e "$1" ]] && { echo "invalid input file"; fn_usage; }
-
-# verify output file:
-if [ "$2"X = "X" ]; then
-    pdf=`echo "$1" | sed 's/\(\.[jJ][pP][gG]\)*$/.pdf/'`
-else
-    pdf="$2"
+# shadowing?
+if [ ${shadow} == "1" ]; then
+    tmp=`sh_uniqfile -f /tmp/`-shadow.jpg
+    if [ ${colors} == "1" ]; then
+        sh_IM_shadow -c "${inputfile}" "${tmp}"
+    else
+        sh_IM_shadow "${inputfile}" "${tmp}"
+    fi
+    inputfile=${tmp}
 fi
-echo "pdf file = $pdf"
+
+# convert!!
 
 unit=PixelsPerInch
 dens=150
+dens=300
 pagesize=$((dens*827/100))x$((dens*1169/100))
 
-convert "$1" -compress jpeg -quality 100                \
+echo "[sh_jpg2pdfA4] inputfile = ${inputfile}"
+echo "[sh_jpg2pdfA4] outfile   = ${outfile}"
+
+convert "${inputfile}" -compress jpeg -quality 100                \
     -resize $pagesize -gravity center -extent $pagesize \
-    -repage $pagesize -units $unit -density ${dens}x${dens} "$pdf"
+    -repage $pagesize -units $unit -density ${dens}x${dens} "${outfile}"
 
 #############################################################################################
